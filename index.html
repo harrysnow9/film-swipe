@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://image.tmdb.org; font-src 'self'; connect-src 'self' https://api.themoviedb.org; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F5F1EA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121010" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Film Swipe">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Film Swipe</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css?v=20261111161629">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+<div id="app">
+  <header class="appbar">
+    <div class="brand">
+      <h1>Film<span>Swipe</span></h1>
+      <p id="sub-label">Pick a film you'll both enjoy</p>
+    </div>
+    <button class="icon-btn" data-act="settings" aria-label="Settings">
+      <svg class="i" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+    </button>
+  </header>
+  <main id="main">
+    <section class="view" id="view-swipe" aria-label="Swipe films"></section>
+    <section class="view" id="view-watch" aria-label="Watchlist" hidden></section>
+    <section class="view" id="view-seen" aria-label="Watched films" hidden></section>
+    <section class="view" id="view-browse" aria-label="All films" hidden></section>
+  </main>
+  <nav class="tabs" aria-label="Sections">
+    <button class="tab" data-tab="swipe"><svg class="i" viewBox="0 0 24 24"><rect x="6" y="3.5" width="12" height="17" rx="2.5"/><path d="M2.5 7v10M21.5 7v10"/></svg>Swipe</button>
+    <button class="tab" data-tab="watch"><svg class="i" viewBox="0 0 24 24"><path d="M6 3.5h12v17l-6-4-6 4z"/></svg>Watchlist<span class="badge" id="badge-watch" hidden></span></button>
+    <button class="tab" data-tab="seen"><svg class="i" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>Watched</button>
+    <button class="tab" data-tab="browse"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5l-4.8-4.8"/></svg>Browse</button>
+  </nav>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="scrim" data-act="close"></div>
+  <div class="sheet-panel" id="sheet-panel" role="dialog" aria-modal="true" tabindex="-1">
+    <div class="grab" aria-hidden="true"></div>
+    <button class="icon-btn sheet-close" data-act="close" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="sheet-body" id="sheet-body"></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="app.js?v=20261111161629"></script>
+</body>
+</html>

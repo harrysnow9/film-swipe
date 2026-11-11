@@ -1,0 +1,29 @@
+{
+  "name": "Film Swipe",
+  "short_name": "Film Swipe",
+  "description": "Swipe through films on your streaming services, build a watchlist and pick tonight's film together.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F1EA",
+  "theme_color": "#B3261E",
+  "icons": [
+    {
+      "sizes": "192x192",
+      "src": "icons/icon-192.png",
+      "type": "image/png"
+    },
+    {
+      "sizes": "512x512",
+      "src": "icons/icon-512.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "maskable",
+      "sizes": "512x512",
+      "src": "icons/icon-maskable-512.png",
+      "type": "image/png"
+    }
+  ]
+}
