@@ -95,6 +95,14 @@ h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.1
 .brand h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
 .brand h1 span{color:var(--accent)}
 .brand p{margin:0;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg-mode{flex:0 0 auto;display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--surface-2)}
+.seg-mode button{border:0;background:none;border-radius:999px;padding:7px 13px;font-size:14px;font-weight:700;color:var(--muted)}
+.seg-mode button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px var(--shadow-c)}
+.tc-tv{font-size:9px;font-weight:800;letter-spacing:.12em;opacity:.85;margin-top:3px}
+.kind-pill{font-size:10px;font-weight:800;letter-spacing:.08em;border-radius:4px;padding:1px 5px;background:var(--surface-2);color:var(--muted);vertical-align:2px;margin-left:4px}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface)}
+.stepper button{border:0;background:none;width:32px;height:30px;font-size:17px;font-weight:700;color:var(--accent)}
+.stepper span{min-width:70px;text-align:center;font-size:13px;font-weight:700}
 .icon-btn{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;flex:0 0 auto}
 .icon-btn svg{width:20px;height:20px}
 svg.i{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}

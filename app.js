@@ -37,11 +37,16 @@ const GENRES={act:['Action','#C2410C','#4A1406','#FFF6EE'],adv:['Adventure','#0F
   dra:['Drama','#6D28D9','#1C1748','#F5F0FF'],fam:['Family','#38BDF8','#5458E0','#FFFFFF'],fan:['Fantasy','#7C3AED','#B0185A','#FFF3FA'],
   his:['History','#B45309','#371B05','#FFF7EC'],hor:['Horror','#262021','#7A1010','#F7E3E3'],mus:['Musical','#EC4899','#6526C9','#FFF5FB'],
   mys:['Mystery','#22408F','#0A0F22','#EEF2FF'],rom:['Romance','#FB7185','#9F1239','#FFF1F3'],sci:['Sci-fi','#0EA5E9','#2C2A78','#F0FBFF'],
-  thr:['Thriller','#3A4658','#0B0F19','#F1F4F9'],war:['War','#55762A','#1C1917','#F4F7EE'],wes:['Western','#D97706','#5E260A','#FFF8EC']};
+  thr:['Thriller','#3A4658','#0B0F19','#F1F4F9'],war:['War','#55762A','#1C1917','#F4F7EE'],wes:['Western','#D97706','#5E260A','#FFF8EC'],
+  rea:['Reality','#0891B2','#7C2D92','#F0FDFF']};
 const MOODS={feel:'Feel-good',laugh:'Big laughs',edge:'Edge of your seat',cry:'Bring tissues',mind:'Mind-bending',epic:'Epic',cosy:'Cosy night in',date:'Date night',kids:'With the kids'};
 const CERTS=['U','PG','12','15','18'];
 const DECADES=[['old','Before 1980'],['1980','1980s'],['1990','1990s'],['2000','2000s'],['2010','2010s'],['2020','2020s']];
 const LENGTHS=[[0,'Any length'],[100,'Under 100 min'],[120,'Under 2 hours'],[150,'Under 2½ hours']];
+const TV_LENGTHS=[[0,'Any episode length'],[30,'Episodes about 30 min'],[45,'Under 45 min'],[60,'Under an hour']];
+const SEASONS=[[0,'Any number of seasons'],[1,'One season or limited series'],[3,'Up to 3 seasons']];
+const kindOf=f=>f.kind||'film';
+const noun=(k,n)=>k==='tv'?(n===1?'show':'shows'):(n===1?'film':'films');
 
 /* ------------------------------------------------------------------
    3. BUILT-IN FILMS
@@ -49,8 +54,8 @@ const LENGTHS=[[0,'Any length'],[100,'Under 100 min'],[120,'Under 2 hours'],[150
    stable 1 = the service made or owns it (it normally stays there); 0 = licensed (may move).
    Services are a best estimate from general knowledge, not a live check. Use TMDB mode to refresh.
    ------------------------------------------------------------------ */
-function F(id,t,y,m,c,g,s,st,mo,d,b){return {id,t,y,m,c,g:g.split(' '),s:s.split(' '),st:!!st,mo:mo?mo.split(' '):[],d,b};}
-const BUILT=[
+function F(id,t,y,m,c,g,s,st,mo,d,b){return {id,t,y,m,c,g:g.split(' '),s:s.split(' '),st:!!st,mo:mo?mo.split(' '):[],d,b,kind:'film'};}
+const BUILT_FILMS=[
 /* Netflix */
 F("irishman","The Irishman",2019,209,"15","cri dra","netflix",1,"epic","Martin Scorsese","An ageing hitman looks back on decades of mob loyalty, and the friend he was ordered to betray."),
 F("roma","Roma",2018,135,"15","dra","netflix",1,"cry","Alfonso Cuarón","A year in the life of a live-in housekeeper in 1970s Mexico City, shot in luminous black and white."),
@@ -212,11 +217,123 @@ F("zoneofinterest","The Zone of Interest",2023,105,"12","dra his war","c4",0,"",
 ];
 
 /* ------------------------------------------------------------------
+   3b. BUILT-IN TV SHOWS
+   T(id, title, first year, last year (0 = still running), seasons, episode minutes, UK age rating, genres,
+     services, stable, moods, created by, one-line summary)
+   Season counts for shows still running may be out of date; TMDB mode refreshes them.
+   ------------------------------------------------------------------ */
+function T(id,t,y,ye,se,m,c,g,s,st,mo,d,b){return {id:'tv-'+id,t,y,ye,se,m,c,g:g.split(' '),s:s.split(' '),st:!!st,mo:mo?mo.split(' '):[],d,b,kind:'tv'};}
+const BUILT_TV=[
+/* Netflix */
+T("strangerthings","Stranger Things",2016,2025,5,60,"15","sci hor dra","netflix",1,"edge epic","The Duffer Brothers","Kids in a small Indiana town take on secret labs and monsters from another dimension."),
+T("crown","The Crown",2016,2023,6,55,"15","dra his","netflix",1,"epic cosy","Peter Morgan","The reign of Elizabeth II, from her wedding to the 2000s, told one decade at a time."),
+T("wednesday","Wednesday",2022,0,2,50,"12","com mys fan","netflix",1,"laugh","Alfred Gough & Miles Millar","Wednesday Addams investigates a string of murders at her new school for outcasts."),
+T("squidgame","Squid Game",2021,2025,3,55,"15","thr dra","netflix",1,"edge","Hwang Dong-hyuk","Hundreds of people in debt compete in deadly children's games for a huge cash prize."),
+T("bridgerton","Bridgerton",2020,0,3,60,"15","rom dra his","netflix",1,"date","Chris Van Dusen","The Bridgerton siblings navigate Regency London's marriage market, one season each."),
+T("adolescence","Adolescence",2025,2025,1,60,"15","dra cri","netflix",1,"cry","Jack Thorne & Stephen Graham","A 13-year-old is arrested for murder. Each episode is filmed in one continuous take."),
+T("babyreindeer","Baby Reindeer",2024,2024,1,35,"18","dra thr","netflix",1,"edge","Richard Gadd","A struggling comedian's small kindness to a stranger spirals into years of stalking."),
+T("ozark","Ozark",2017,2022,4,60,"15","cri thr dra","netflix",1,"edge","Bill Dubuque & Mark Williams","A financial adviser moves his family to the Ozarks to launder money for a drug cartel."),
+T("narcos","Narcos",2015,2017,3,50,"18","cri dra his","netflix",1,"edge","Chris Brancato, Carlo Bernard & Doug Miro","US agents hunt Pablo Escobar and the Colombian cocaine cartels."),
+T("mindhunter","Mindhunter",2017,2019,2,55,"15","cri thr","netflix",1,"edge mind","Joe Penhall","Two FBI agents interview jailed serial killers to understand how they think."),
+T("queensgambit","The Queen's Gambit",2020,2020,1,60,"15","dra","netflix",1,"feel","Scott Frank & Allan Scott","An orphaned chess prodigy fights addiction on her way to the top of the game."),
+T("blackmirror","Black Mirror",2011,0,7,60,"15","sci thr dra","netflix",1,"mind","Charlie Brooker","Standalone stories about technology going wrong, from darkly funny to deeply unsettling."),
+T("sexeducation","Sex Education",2019,2023,4,55,"15","com dra","netflix",1,"laugh feel","Laurie Nunn","A shy teenager sets up a sex advice clinic at school, with help from his therapist mum."),
+T("heartstopper","Heartstopper",2022,2024,3,30,"12","rom dra","netflix",1,"feel cosy date","Alice Oseman","Two British schoolboys become friends and fall for each other."),
+T("umbrellaacademy","The Umbrella Academy",2019,2024,4,50,"15","act sci com","netflix",1,"laugh","Steve Blackman","Estranged adopted siblings with superpowers reunite to stop the apocalypse."),
+T("arcane","Arcane",2021,2024,2,40,"15","ani act fan","netflix",1,"epic","Christian Linke & Alex Yee","Two sisters end up on opposite sides of a war between a gleaming city and its undercity."),
+T("witcher","The Witcher",2019,0,4,60,"15","fan act","netflix",1,"epic","Lauren Schmidt Hissrich","A monster hunter for hire is drawn into a fight over the fate of a powerful princess."),
+T("lupin","Lupin",2021,0,3,45,"15","cri thr","netflix",1,"edge","George Kay","A gentleman thief in Paris sets out to avenge his father, inspired by Arsène Lupin."),
+T("dark","Dark",2017,2020,3,55,"15","sci mys thr","netflix",1,"mind","Baran bo Odar & Jantje Friese","A child's disappearance in a German town uncovers a time-travel mystery across generations."),
+T("moneyheist","Money Heist",2017,2021,5,50,"15","cri thr","netflix",1,"edge","Álex Pina","A criminal mastermind leads a crew to rob the Royal Mint of Spain."),
+T("gentlemen","The Gentlemen",2024,0,1,55,"18","cri com","netflix",1,"laugh edge","Guy Ritchie","An aristocrat inherits his father's estate and discovers it hides a cannabis empire."),
+T("3body","3 Body Problem",2024,0,1,60,"15","sci dra","netflix",1,"mind epic","David Benioff, D. B. Weiss & Alexander Woo","Five Oxford friends uncover a threat to humanity that began decades ago."),
+T("bojack","BoJack Horseman",2014,2020,6,25,"15","ani com dra","netflix",1,"laugh cry","Raphael Bob-Waksberg","A washed-up horse sitcom star tries, and mostly fails, to become a better person."),
+T("nightagent","The Night Agent",2023,0,2,50,"15","act thr","netflix",1,"edge","Shawn Ryan","A low-level FBI agent answers an emergency line and is pulled into a White House conspiracy."),
+T("nobodywantsthis","Nobody Wants This",2024,0,2,30,"15","rom com","netflix",1,"date laugh feel","Erin Foster","An agnostic podcast host falls for a newly single rabbi."),
+T("drivetosurvive","Formula 1: Drive to Survive",2019,0,7,40,"15","doc","netflix",1,"edge","James Gay-Rees & Paul Martin","Behind the scenes with the drivers and teams of each Formula 1 season."),
+T("ourplanet","Our Planet",2019,2019,1,50,"PG","doc fam","netflix",1,"epic kids","Alastair Fothergill & Keith Scholey","David Attenborough narrates the wonders of the natural world and what threatens them."),
+/* Disney+ */
+T("thebear","The Bear",2022,0,4,30,"15","com dra","disney",1,"edge","Christopher Storer","A fine-dining chef returns to Chicago to run his late brother's chaotic sandwich shop."),
+T("shogun","Shōgun",2024,0,1,60,"18","dra his war","disney",1,"epic","Rachel Kondo & Justin Marks","An English navigator is caught up in a deadly power struggle in 1600 Japan."),
+T("andor","Andor",2022,2025,2,50,"12","sci act dra","disney",1,"epic edge","Tony Gilroy","A thief becomes a rebel in the years before Rogue One."),
+T("mandalorian","The Mandalorian",2019,2023,3,40,"12","sci adv act","disney",1,"epic feel","Jon Favreau","A lone bounty hunter protects a mysterious child across the galaxy."),
+T("loki","Loki",2021,2023,2,50,"12","sci fan com","disney",1,"mind laugh","Michael Waldron","Marvel's god of mischief is recruited by an agency that polices time."),
+T("onlymurders","Only Murders in the Building",2021,0,5,35,"12","com mys cri","disney",1,"laugh cosy date","Steve Martin & John Hoffman","Three neighbours who love true-crime podcasts start one about a death in their building."),
+T("simpsons","The Simpsons",1989,0,36,22,"PG","ani com","disney",1,"laugh cosy","Matt Groening","America's favourite yellow family, still going after more than 35 years."),
+T("abbott","Abbott Elementary",2021,0,4,22,"12","com","disney",1,"laugh feel","Quinta Brunson","Dedicated teachers at an underfunded Philadelphia school, filmed as a mockumentary."),
+T("wandavision","WandaVision",2021,2021,1,35,"12","sci com mys","disney",1,"mind","Jac Schaeffer","Wanda and Vision live an idyllic sitcom life, but something is very wrong."),
+T("lost","Lost",2004,2010,6,45,"15","mys dra sci","disney",1,"mind edge","J. J. Abrams, Damon Lindelof & Jeffrey Lieber","Plane crash survivors on a mysterious island discover it isn't empty."),
+T("modernfamily","Modern Family",2009,2020,11,22,"12","com","disney",1,"laugh cosy","Christopher Lloyd & Steven Levitan","Three branches of one sprawling family, filmed as a mockumentary."),
+T("daredevil","Daredevil: Born Again",2025,0,1,50,"15","act cri","disney",1,"edge","Dario Scardapane","Blind lawyer Matt Murdock faces his old enemy Wilson Fisk, now Mayor of New York."),
+/* Apple TV */
+T("severance","Severance",2022,0,2,55,"15","sci thr mys","apple",1,"mind edge","Dan Erickson","Office workers have their memories surgically split between work and home."),
+T("tedlasso","Ted Lasso",2020,0,3,40,"15","com dra","apple",1,"feel laugh cosy","Jason Sudeikis, Bill Lawrence & others","An upbeat American football coach is hired to manage a struggling English football club."),
+T("slowhorses","Slow Horses",2022,0,5,45,"15","thr com","apple",1,"edge laugh","Will Smith","MI5's rejects, led by the slovenly Jackson Lamb, keep stumbling into real spy plots."),
+T("thestudio","The Studio",2025,0,1,30,"15","com","apple",1,"laugh","Seth Rogen & Evan Goldberg","A film-loving new studio boss tries to make good movies and keep his bosses happy."),
+T("silo","Silo",2023,0,2,50,"15","sci mys","apple",1,"mind edge","Graham Yost","The last ten thousand people live in a giant underground silo, and nobody knows why."),
+T("foundation","Foundation",2021,0,3,60,"12","sci dra","apple",1,"epic mind","David S. Goyer & Josh Friedman","A mathematician predicts the fall of a galactic empire and tries to shorten the dark age."),
+T("pachinko","Pachinko",2022,2024,2,55,"15","dra his","apple",1,"cry epic","Soo Hugh","Four generations of a Korean family who move to Japan."),
+T("badsisters","Bad Sisters",2022,0,2,50,"15","com cri dra","apple",1,"laugh edge","Sharon Horgan & Dave Finkel","Four Irish sisters are suspects after their sister's cruel husband dies."),
+T("pluribus","Pluribus",2025,0,1,50,"15","sci com dra","apple",1,"mind","Vince Gilligan","The most miserable woman on Earth must save the world from happiness."),
+T("mastersair","Masters of the Air",2024,2024,1,60,"15","war dra his","apple",1,"epic","John Shiban & John Orloff","American bomber crews fly deadly missions over Europe in the Second World War."),
+/* Prime Video */
+T("theboys","The Boys",2019,0,4,60,"18","act com sci","prime",1,"edge laugh","Eric Kripke","Vigilantes take on corrupt, celebrity superheroes who abuse their powers."),
+T("reacher","Reacher",2022,0,3,50,"15","act cri","prime",1,"edge","Nick Santora","Ex-military cop Jack Reacher drifts into towns with trouble and sorts it out."),
+T("fallout","Fallout",2024,0,2,60,"18","sci act com","prime",1,"edge laugh","Geneva Robertson-Dworet & Graham Wagner","A sheltered vault dweller heads out into a post-nuclear Los Angeles."),
+T("invincible","Invincible",2021,0,3,45,"18","ani act sci","prime",1,"edge","Robert Kirkman","The teenage son of the world's most powerful superhero develops powers of his own."),
+T("clarkson","Clarkson's Farm",2021,0,4,50,"15","doc com","prime",1,"laugh cosy","Andy Wilman","Jeremy Clarkson tries to run a farm in the Cotswolds, with mixed results."),
+T("fleabag","Fleabag",2016,2019,2,25,"15","com dra","prime iplayer",0,"laugh cry","Phoebe Waller-Bridge","A grieving, chaotic Londoner breaks the fourth wall to tell us what she really thinks."),
+T("goodomens","Good Omens",2019,0,2,55,"15","fan com","prime",1,"laugh cosy","Neil Gaiman","An angel and a demon team up to stop the end of the world."),
+T("maisel","The Marvelous Mrs. Maisel",2017,2023,5,55,"15","com dra","prime",1,"feel laugh","Amy Sherman-Palladino","A 1950s New York housewife discovers a talent for stand-up comedy."),
+T("mrmrssmith","Mr. & Mrs. Smith",2024,0,1,55,"15","act com rom","prime",1,"date","Francesca Sloane & Donald Glover","Two strangers become spies and are told to pose as a married couple."),
+T("ringsofpower","The Rings of Power",2022,0,2,65,"12","fan adv","prime",1,"epic","J. D. Payne & Patrick McKay","Middle-earth's Second Age, when the rings of power were forged."),
+/* BBC iPlayer */
+T("lineofduty","Line of Duty",2012,2021,6,60,"15","cri thr dra","iplayer",1,"edge","Jed Mercurio","An anti-corruption police unit investigates its own officers."),
+T("happyvalley","Happy Valley",2014,2023,3,60,"15","cri dra","iplayer",1,"edge","Sally Wainwright","A Yorkshire police sergeant's path crosses again with the man she blames for her daughter's death."),
+T("gavinstacey","Gavin & Stacey",2007,2024,3,30,"12","com rom","iplayer",1,"laugh cosy feel","James Corden & Ruth Jones","An Essex lad and a Welsh girl fall in love, and their families collide."),
+T("traitors","The Traitors",2022,0,4,60,"12","rea","iplayer",1,"edge","Studio Lambert","Contestants in a Scottish castle try to unmask the traitors hidden among them."),
+T("bluelights","Blue Lights",2023,0,3,60,"15","cri dra","iplayer",1,"edge","Declan Lawn & Adam Patterson","Rookie police officers in Belfast learn the job on dangerous streets."),
+T("detectorists","Detectorists",2014,2022,3,30,"12","com","iplayer",1,"cosy feel","Mackenzie Crook","Two friends spend their weekends metal detecting in the Suffolk fields."),
+T("normalpeople","Normal People",2020,2020,1,30,"15","rom dra","iplayer",1,"cry date","Sally Rooney, Alice Birch & Mark O'Rowe","Two Irish teenagers drift together and apart through school and university."),
+T("industry","Industry",2020,0,3,55,"18","dra","iplayer",0,"edge","Mickey Down & Konrad Kay","Graduates compete for permanent jobs at a cut-throat London investment bank."),
+T("peaky","Peaky Blinders",2013,2022,6,60,"18","cri dra his","iplayer netflix",0,"edge epic","Steven Knight","A Birmingham gang family led by Tommy Shelby rises after the First World War."),
+T("sherlock","Sherlock",2010,2017,4,90,"12","cri mys dra","iplayer",0,"mind","Mark Gatiss & Steven Moffat","Sherlock Holmes and Dr Watson solve crimes in modern-day London."),
+T("bluey","Bluey",2018,0,3,7,"U","ani com fam","iplayer",1,"kids feel laugh","Joe Brumm","A Blue Heeler puppy and her family turn everyday life into games."),
+/* ITVX */
+T("mrbates","Mr Bates vs The Post Office",2024,2024,1,60,"12","dra","itvx",1,"cry","Gwyneth Hughes","Sub-postmasters wrongly accused of theft fight back against the Post Office."),
+T("broadchurch","Broadchurch",2013,2017,3,50,"15","cri mys dra","itvx",1,"edge","Chris Chibnall","A boy's death tears apart a small Dorset seaside town."),
+T("vera","Vera",2011,2025,14,90,"12","cri mys","itvx",1,"cosy","Paul Rutman & others","A sharp, shabby detective solves murders across Northumberland."),
+T("downton","Downton Abbey",2010,2015,6,60,"12","dra his","itvx",0,"cosy epic","Julian Fellowes","Life upstairs and downstairs at a grand Yorkshire house in the early 1900s."),
+/* Channel 4 */
+T("derrygirls","Derry Girls",2018,2022,3,25,"15","com","c4 netflix",0,"laugh feel","Lisa McGee","A group of teenagers grow up in Derry in the 1990s."),
+T("bakeoff","The Great British Bake Off",2010,0,15,60,"PG","rea","c4",1,"cosy feel kids","Love Productions","Amateur bakers compete in a tent in the English countryside."),
+T("taskmaster","Taskmaster",2015,0,19,45,"15","com rea","c4",1,"laugh","Alex Horne","Five comedians attempt absurd tasks set by Alex Horne and judged by Greg Davies."),
+T("itsasin","It's a Sin",2021,2021,1,50,"15","dra","c4",1,"cry","Russell T Davies","A group of friends in 1980s London live through the AIDS crisis."),
+T("peepshow","Peep Show",2003,2015,9,25,"15","com","c4",1,"laugh","Jesse Armstrong & Sam Bain","Two dysfunctional flatmates in Croydon, with their inner thoughts out loud."),
+/* NOW / Sky (HBO and Sky shows) */
+T("succession","Succession",2018,2023,4,60,"15","dra com","now",0,"edge laugh","Jesse Armstrong","The Roy children scheme to take over their father's media empire."),
+T("whitelotus","The White Lotus",2021,0,3,60,"15","com dra","now",0,"laugh edge","Mike White","Guests and staff at a luxury resort, one week at a time, ending with a death."),
+T("lastofus","The Last of Us",2023,0,2,55,"15","sci hor dra","now",0,"edge cry","Craig Mazin & Neil Druckmann","A smuggler escorts a teenage girl across a post-apocalyptic America."),
+T("chernobyl","Chernobyl",2019,2019,1,65,"15","dra his","now",0,"edge","Craig Mazin","The 1986 nuclear disaster and the people who tried to contain it."),
+T("got","Game of Thrones",2011,2019,8,60,"18","fan dra","now",0,"epic edge","David Benioff & D. B. Weiss","Noble families fight for the Iron Throne as an ancient threat gathers in the north."),
+T("hotd","House of the Dragon",2022,0,2,60,"18","fan dra","now",0,"epic","Ryan Condal & George R. R. Martin","The Targaryen family tears itself apart over the throne, 200 years before Game of Thrones."),
+T("penguin","The Penguin",2024,2024,1,60,"15","cri dra","now",0,"edge","Lauren LeFranc","Oz Cobb fights his way up Gotham's criminal underworld."),
+T("sopranos","The Sopranos",1999,2007,6,55,"18","cri dra","now",0,"epic","David Chase","A New Jersey mob boss sees a therapist about his panic attacks."),
+T("bandofbrothers","Band of Brothers",2001,2001,1,60,"15","war dra his","now",0,"epic cry","Tom Hanks & Steven Spielberg","Easy Company from D-Day to the end of the war in Europe."),
+T("dayofthejackal","The Day of the Jackal",2024,0,1,55,"15","thr act","now",1,"edge","Ronan Bennett","A British agent hunts an elusive assassin for hire across Europe."),
+/* Paramount+ */
+T("yellowstone","Yellowstone",2018,2024,5,60,"15","dra wes","paramount",0,"epic","Taylor Sheridan & John Linson","The Dutton family fights to keep the biggest ranch in Montana."),
+T("1923","1923",2022,2025,2,60,"15","wes dra his","paramount",0,"epic","Taylor Sheridan","An earlier generation of Duttons faces drought, depression and Prohibition."),
+T("landman","Landman",2024,0,2,50,"15","dra","paramount",0,"edge","Taylor Sheridan & Christian Wallace","A crisis manager for an oil company navigates the boomtowns of West Texas.")
+];
+const BUILT=BUILT_FILMS.concat(BUILT_TV);
+
+/* ------------------------------------------------------------------
    4. STATE (saved on this device only)
    ------------------------------------------------------------------ */
 const KEY='filmSwipe.v1', TKEY='filmSwipe.tmdbKey';
-function emptyFilters(){return {genres:[],moods:[],maxMins:0,maxCert:'',decades:[],svc:[]};}
-function defaults(){return {v:1,setup:false,settings:{services:[],custom:[],onlyMine:true,posters:false},filters:emptyFilters(),
+function emptyFilters(){return {genres:[],moods:[],maxMins:0,maxCert:'',decades:[],svc:[],maxSeasons:0,ended:false};}
+function defaults(){return {v:1,setup:false,mode:'film',togs:{},settings:{services:[],custom:[],onlyMine:true,posters:false},filters:emptyFilters(),
   seed:Math.floor(Math.random()*1e9),decided:{},history:[],front:[],watch:[],watched:{},tonight:null,own:[],svcOverride:{},
   live:{},found:[],tmIds:{},tm:{prov:null,provT:0,page:0,q:'',status:''},tog:null,tab:'swipe'};}
 let state=defaults();
@@ -258,7 +375,7 @@ function myServices(){return state.settings.services||[];}
 let filmIndex=null;
 function reindex(){filmIndex=null;}
 function allFilms(){return BUILT.concat(state.own,state.found);}
-function getFilm(id){if(!filmIndex){filmIndex=new Map(); allFilms().forEach(f=>filmIndex.set(f.id,f));} return filmIndex.get(id);}
+function getFilm(id){if(!filmIndex){filmIndex=new Map(); allFilms().forEach(f=>{const l=state.live[f.id]; if(l&&l.tv&&kindOf(f)==='tv'&&!f.own){if(l.tv.se) f.se=l.tv.se; f.ye=l.tv.ye; if(l.tv.m) f.m=l.tv.m;} filmIndex.set(f.id,f);});} return filmIndex.get(id);}
 function svcOf(f){const o=state.svcOverride[f.id]; if(o) return o; const l=state.live[f.id]; if(l&&l.svc) return l.svc; return f.s||[];}
 function svcSource(f){if(state.svcOverride[f.id]) return 'you'; const l=state.live[f.id]; if(l&&l.svc) return 'live'; return f.own?'you':'built';}
 function onMine(f){const m=myServices(); return svcOf(f).some(k=>m.includes(k));}
@@ -267,7 +384,11 @@ function inWatch(id){return state.watch.some(w=>w.id===id);}
 function certClass(c){return c?(/^\d/.test(c)?'c'+c:c):'';}
 function certRank(c){return CERTS.indexOf(c);}
 function hrs(m){if(!m) return ''; const h=Math.floor(m/60), mm=m%60; return h?`${h}h ${String(mm).padStart(2,'0')}m`:`${mm} min`;}
-function factsText(f){return [f.y,f.m?hrs(f.m):'',f.c?'Cert '+f.c:''].filter(Boolean).join(' · ');}
+function yearsText(f){if(kindOf(f)!=='tv') return String(f.y||''); if(!f.y) return ''; return f.ye===f.y?String(f.y):f.ye?`${f.y}–${f.ye}`:`${f.y}–`;}
+function seasonsText(f){return f.se?plural(f.se,'season')+(f.ye?'':' so far'):'';}
+function factsText(f){
+  if(kindOf(f)==='tv') return [yearsText(f),f.se?plural(f.se,'season'):'',f.m?`${f.m} min episodes`:'',f.c?'Age '+f.c:''].filter(Boolean).join(' · ');
+  return [f.y,f.m?hrs(f.m):'',f.c?'Cert '+f.c:''].filter(Boolean).join(' · ');}
 function genreText(f){return (f.g||[]).map(g=>GENRES[g]?GENRES[g][0]:g).join(', ');}
 function svcTags(f,opt={}){const list=svcOf(f), m=myServices();
   if(!list.length) return `<span class="svc none">${opt.short?'Not on a service':'Not on a UK subscription service we know of'}</span>`;
@@ -282,7 +403,7 @@ function artHtml(f,cls){
   const g=GENRES[(f.g||[])[0]]||GENRES.dra, h=hash(f.id), lay=h%3, ang=120+(h>>3)%90, poster=posterPath(f), mini=cls==='mini';
   return `<div class="tc l${lay} ${cls||''}${poster?' has-poster':''}" style="--a:${g[1]};--b:${g[2]};--tk:${g[3]};--ang:${ang}deg" aria-hidden="true">
     ${poster?`<img class="poster" src="https://image.tmdb.org/t/p/${mini?'w92':'w500'}${esc(poster)}" alt="" referrerpolicy="no-referrer" loading="lazy">`:''}
-    <div class="tc-in">${mini?`<b class="tc-mono">${esc(mono(f.t))}</b>`:`<span class="tc-year num">${esc(f.y||'')}</span><b class="tc-title" style="--fs:${titleSize(f.t)}">${esc(f.t)}</b>${f.d?`<span class="tc-dir">${esc(f.d)}</span>`:''}`}</div>
+    <div class="tc-in">${mini?`<b class="tc-mono">${esc(mono(f.t))}</b>${kindOf(f)==='tv'?'<span class="tc-tv">TV</span>':''}`:`<span class="tc-year num">${esc(yearsText(f))}</span><b class="tc-title" style="--fs:${titleSize(f.t)}">${esc(f.t)}</b>${kindOf(f)==='tv'?`<span class="tc-dir">TV series${f.se?' · '+esc(plural(f.se,'season')):''}</span>`:f.d?`<span class="tc-dir">${esc(f.d)}</span>`:''}`}</div>
     ${f.c?`<span class="cert ${certClass(f.c)}">${esc(f.c)}</span>`:''}</div>`;}
 
 /* ------------------------------------------------------------------
@@ -296,20 +417,23 @@ function matchesFilters(f,flt){flt=flt||state.filters;
   if(flt.maxCert&&(certRank(f.c)<0||certRank(f.c)>certRank(flt.maxCert))) return false;
   if(flt.decades.length&&!flt.decades.includes(decadeOf(f.y))) return false;
   if(flt.svc.length&&!svcOf(f).some(k=>flt.svc.includes(k))) return false;
+  if(kindOf(f)==='tv'){ if(flt.maxSeasons&&f.se&&f.se>flt.maxSeasons) return false; if(flt.ended&&!f.ye) return false; }
   return true;}
+function modeFilms(){return allFilms().filter(f=>kindOf(f)===state.mode);}
 function serviceGate(f){return !(state.settings.onlyMine&&myServices().length)||onMine(f);}
 function deck(){
   const front=state.front||[];
-  const list=allFilms().filter(f=>!state.decided[f.id]&&!state.watched[f.id]&&!inWatch(f.id)&&serviceGate(f)&&matchesFilters(f));
+  const list=modeFilms().filter(f=>!state.decided[f.id]&&!state.watched[f.id]&&!inWatch(f.id)&&serviceGate(f)&&matchesFilters(f));
   const key=f=>{const i=front.indexOf(f.id); return i>=0?-1e13+i:hash(state.seed+':'+f.id);};
   return list.sort((a,b)=>key(a)-key(b));}
-function filterCount(){const f=state.filters; return f.genres.length+f.moods.length+f.decades.length+f.svc.length+(f.maxMins?1:0)+(f.maxCert?1:0);}
+function filterCount(){const f=state.filters; return f.genres.length+f.moods.length+f.decades.length+f.svc.length+(f.maxMins?1:0)+(f.maxCert?1:0)+(state.mode==='tv'?(f.maxSeasons?1:0)+(f.ended?1:0):0);}
+function setMode(m){if(m===state.mode) return; state.mode=m; state.filters.maxMins=0; save(); renderAll(); toast(m==='tv'?'Showing TV shows':'Showing films');}
 
 /* ------------------------------------------------------------------
    7. SWIPE
    ------------------------------------------------------------------ */
 function cardHtml(f,i,top){
-  const both=state.tog&&state.tog.matches&&state.tog.matches.includes(f.id);
+  const both=TG()&&TG().matches&&TG().matches.includes(f.id);
   return `<article class="card${top?' top':''}" data-id="${esc(f.id)}" style="transform:translateY(${i*8}px) scale(${1-i*0.03});z-index:${10-i}" ${top?'tabindex="0" aria-label="'+esc(f.t)+'. Swipe right to add to watchlist, left to skip, or press Enter for details."':'aria-hidden="true"'}>
     ${artHtml(f)}
     <span class="stamp pick">WATCH</span><span class="stamp nope">NOPE</span><span class="stamp seen">SEEN IT</span>
@@ -341,16 +465,16 @@ function renderSwipe(){
     ${Object.keys(MOODS).map(k=>`<button class="chip" data-act="fmood" data-v="${k}" aria-pressed="${f.moods.includes(k)}">${esc(MOODS[k])}</button>`).join('')}`;
   let body;
   if(!d.length){const skipped=Object.values(state.decided).filter(x=>x==='L').length;
-    body=`<div class="empty"><h2>That's every film for now</h2><p>You've seen everything that matches${state.settings.onlyMine&&mine.length?' on your services':''}${fc?' and your filters':''}${skipped?`, and skipped ${skipped}`:''}.</p>
+    body=`<div class="empty"><h2>That's every ${state.mode==='tv'?'show':'film'} for now</h2><p>You've seen everything that matches${state.settings.onlyMine&&mine.length?' on your services':''}${fc?' and your filters':''}${skipped?`, and skipped ${skipped}`:''}.</p>
       <div class="row" style="width:100%;max-width:360px">${skipped?'<button class="btn primary" data-act="reshow">Show skipped again</button>':''}${fc?'<button class="btn" data-act="clearfilters">Clear filters</button>':''}
-      ${tmdbKey()?'<button class="btn" data-act="findmore">Find more films</button>':''}${state.settings.onlyMine&&mine.length?'<button class="btn" data-act="onlymine">Include other services</button>':''}</div></div>`;}
+      ${tmdbKey()?`<button class="btn" data-act="findmore">Find more ${noun(state.mode,2)}</button>`:''}${state.settings.onlyMine&&mine.length?'<button class="btn" data-act="onlymine">Include other services</button>':''}</div></div>`;}
   else body=`<div class="deck" id="deck">${d.slice(0,3).map((x,i)=>cardHtml(x,i,i===0)).reverse().join('')}</div>
     <div class="actions"><button class="act sm" data-act="undo" aria-label="Undo last swipe">${ICON.undo}</button>
       <button class="act lg skip" data-act="skip" aria-label="Skip this film">${ICON.x}</button>
       <button class="act sm seen" data-act="seen" aria-label="Seen it already">${ICON.eye}</button>
       <button class="act lg pick" data-act="pick" aria-label="Add to watchlist">${ICON.heart}</button>
       <button class="act sm" data-act="info" aria-label="Film details">${ICON.info}</button></div>`;
-  v.innerHTML=`${tonightHtml()}<div class="strip"><div><b class="num">${plural(d.length,'film')} to swipe</b><div class="small muted">${mine.length?(state.settings.onlyMine?'On your services':'All services, yours marked ✓'):'<button class="x-btn" data-act="services" style="padding:0">Choose your services</button>'}</div></div>
+  v.innerHTML=`${tonightHtml()}<div class="strip"><div><b class="num">${d.length} ${noun(state.mode,d.length)} to swipe</b><div class="small muted">${mine.length?(state.settings.onlyMine?'On your services':'All services, yours marked ✓'):'<button class="x-btn" data-act="services" style="padding:0">Choose your services</button>'}</div></div>
     <div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="together">Swipe together</button></div></div>
     <div class="chips" role="group" aria-label="Filter films">${chips}</div>${body}`;
   const top=$('#deck .card.top'); if(top) bindDrag(top);}
@@ -379,14 +503,14 @@ function decide(dir){
   card.classList.add('leaving');
   setTimeout(()=>{busy=false;applyDecision(id,dir);},reduced()?0:240);}
 function applyDecision(id,dir){
-  if(togOn()){const T=state.tog; T.dec[id]=dir; T.hist.push(id); T.matches=null; save(); renderSwipe(); if(!togLeft().length) toast(`All ${TOG_N} done. Swap codes!`); return;}
+  if(togOn()){const T=TG(); T.dec[id]=dir; T.hist.push(id); T.matches=null; save(); renderSwipe(); if(!togLeft().length) toast(`All ${TOG_N} done. Swap codes!`); return;}
   state.decided[id]=dir; state.history.push(id); state.front=state.front.filter(x=>x!==id);
   if(dir==='R'&&!inWatch(id)) state.watch.unshift({id,t:Date.now()});
   if(dir==='S'&&!state.watched[id]) state.watched[id]={t:Date.now(),r:0,swipe:true};
   save(); renderSwipe(); renderNav();
   if(dir==='S') toast('Marked as seen. Rate it on the Watched tab');}
 function undo(){
-  if(togOn()){const T=state.tog, tid=T.hist.pop(); if(!tid){toast('Nothing to undo');return;} delete T.dec[tid]; T.matches=null; save(); renderSwipe(); toast('Brought it back'); return;}
+  if(togOn()){const T=TG(), tid=T.hist.pop(); if(!tid){toast('Nothing to undo');return;} delete T.dec[tid]; T.matches=null; save(); renderSwipe(); toast('Brought it back'); return;}
   const id=state.history.pop(); if(!id){toast('Nothing to undo');return;}
   const d=state.decided[id];
   if(d==='R') state.watch=state.watch.filter(w=>w.id!==id);
@@ -403,28 +527,39 @@ function filmRow(f,extra){
       <span class="film-meta num">${esc(factsText(f))}</span><div class="svcs">${svcTags(f,{short:true})}</div></div>
     <div class="film-side">${extra&&extra.side||''}</div>
     ${extra&&extra.actions?`<div class="film-actions">${extra.actions}</div>`:''}</div>`;}
+let watchKind='all';
+function tvActions(f,w){
+  if(kindOf(f)!=='tv') return '';
+  return w.s?`<div class="stepper" role="group" aria-label="Season you're on"><button data-act="tvseason" data-id="${esc(f.id)}" data-d="-1" aria-label="Previous season">−</button><span class="num">Season ${w.s}${f.se?' of '+f.se:''}</span><button data-act="tvseason" data-id="${esc(f.id)}" data-d="1" aria-label="Next season">+</button></div>`
+    :`<button class="btn sm" data-act="tvstart" data-id="${esc(f.id)}">Started it</button>`;}
 function renderWatch(){
-  const v=$('#view-watch'); let list=state.watch.map(w=>({w,f:getFilm(w.id)})).filter(x=>x.f);
-  if(!list.length){v.innerHTML=`${tonightHtml()}<div class="empty" style="min-height:58vh"><h2>Your watchlist is empty</h2><p>Swipe right on films you'd like to watch. They'll wait here until film night.</p>
+  const v=$('#view-watch'); let all=state.watch.map(w=>({w,f:getFilm(w.id)})).filter(x=>x.f);
+  let list=all.filter(x=>watchKind==='all'||kindOf(x.f)===watchKind);
+  if(!all.length){v.innerHTML=`${tonightHtml()}<div class="empty" style="min-height:58vh"><h2>Your watchlist is empty</h2><p>Swipe right on films and shows you'd like to watch. They'll wait here until you're ready.</p>
     <div class="row" style="width:100%;max-width:360px"><button class="btn primary" data-tab="swipe">Start swiping</button><button class="btn" data-act="together">Swipe together</button></div></div>`; return;}
   if(watchSort==='short') list.sort((a,b)=>(a.f.m||999)-(b.f.m||999));
   else if(watchSort==='service') list.sort((a,b)=>{const ka=(mineOf(a.f)[0]||'~'+(svcOf(a.f)[0]||'~')), kb=(mineOf(b.f)[0]||'~'+(svcOf(b.f)[0]||'~')); return ka<kb?-1:ka>kb?1:0;});
-  const onMy=list.filter(x=>onMine(x.f)).length;
+  const onMy=list.filter(x=>onMine(x.f)).length, nf=all.filter(x=>kindOf(x.f)==='film').length, nt=all.length-nf;
+  const watching=list.filter(x=>x.w.s), rest=list.filter(x=>!x.w.s);
+  const row=({w,f})=>filmRow(f,{side:w.both?'<span class="pill">You both liked</span>':w.s?'<span class="pill gold">Watching</span>':'',
+      actions:`${tvActions(f,w)}<button class="btn sm" data-act="settonight" data-id="${esc(f.id)}">Tonight</button><button class="toggle" data-act="markwatched" data-id="${esc(f.id)}">${kindOf(f)==='tv'?'Finished it':'Watched it'}</button><button class="x-btn" data-act="unwatch" data-id="${esc(f.id)}">Remove</button>`});
   v.innerHTML=`${tonightHtml()}
     <button class="btn primary block" data-act="spin">${ICON.dice} What shall we watch tonight?</button>
-    <div class="kv"><h2 style="font-size:22px" class="num">${plural(list.length,'film')}</h2><span class="small muted num">${myServices().length?`${onMy} on your services`:''}</span></div>
-    <div class="chips" role="group" aria-label="Sort">${[['added','Recently added'],['short','Shortest first'],['service','By service']].map(([k,l])=>`<button class="chip" data-act="wsort" data-v="${k}" aria-pressed="${watchSort===k}">${l}</button>`).join('')}</div>
-    ${list.map(({w,f})=>filmRow(f,{side:w.both?'<span class="pill">You both liked</span>':'',
-      actions:`<button class="btn sm" data-act="settonight" data-id="${esc(f.id)}">Tonight</button><button class="toggle" data-act="markwatched" data-id="${esc(f.id)}">Watched it</button><button class="x-btn" data-act="unwatch" data-id="${esc(f.id)}">Remove</button>`})).join('')}`;}
+    <div class="chips" role="group" aria-label="Show">${[['all',`All · ${all.length}`],['film',`Films · ${nf}`],['tv',`TV · ${nt}`]].map(([k,l])=>`<button class="chip" data-act="wkind" data-v="${k}" aria-pressed="${watchKind===k}">${l}</button>`).join('')}</div>
+    <div class="kv"><span class="small muted num">${myServices().length?`${onMy} of ${list.length} on your services`:''}</span>
+      <div class="chips" role="group" aria-label="Sort" style="margin:0;padding:0">${[['added','Newest'],['short','Shortest'],['service','By service']].map(([k,l])=>`<button class="chip" data-act="wsort" data-v="${k}" aria-pressed="${watchSort===k}">${l}</button>`).join('')}</div></div>
+    ${watching.length?`<div class="section-title">Watching now</div>${watching.map(row).join('')}<div class="section-title">Up next</div>`:''}
+    ${rest.length?rest.map(row).join(''):list.length?'':`<p class="muted">No ${watchKind==='tv'?'shows':'films'} on your watchlist yet.</p>`}`;}
 function setTonight(id){state.tonight={id,t:Date.now()}; save(); renderAll(); const f=getFilm(id); toast(`Tonight: ${f?f.t:'film'}`);}
-let spinOpt={from:'watch',max:0,mood:'',mine:true}, spinLast=null, spinPick=null;
+let spinOpt={from:'watch',max:0,mood:'',mine:true,kind:'any'}, spinLast=null, spinPick=null;
 function spinPool(){
   const base=spinOpt.from==='watch'?state.watch.map(w=>getFilm(w.id)).filter(Boolean):allFilms().filter(f=>!state.watched[f.id]&&state.decided[f.id]!=='L');
-  return base.filter(f=>(!spinOpt.max||!f.m||f.m<=spinOpt.max)&&(!spinOpt.mood||(f.mo||[]).includes(spinOpt.mood))&&(!spinOpt.mine||!myServices().length||onMine(f)));}
+  return base.filter(f=>(spinOpt.kind==='any'||kindOf(f)===spinOpt.kind)&&(!spinOpt.max||!f.m||f.m<=spinOpt.max)&&(!spinOpt.mood||(f.mo||[]).includes(spinOpt.mood))&&(!spinOpt.mine||!myServices().length||onMine(f)));}
 function spinSheet(){spinPick=null; const draw=()=>{const pool=spinPool(), f=spinPick&&getFilm(spinPick);
   return `<h2>What shall we watch tonight?</h2>
     <div class="chips wrap" role="group" aria-label="Choose from">${[['watch','From our watchlist'],['all','Anything we haven\u2019t seen']].map(([k,l])=>`<button class="chip" data-act="spinopt" data-k="from" data-v="${k}" aria-pressed="${spinOpt.from===k}">${l}</button>`).join('')}</div>
-    <div class="chips wrap" role="group" aria-label="Length">${LENGTHS.map(([k,l])=>`<button class="chip" data-act="spinopt" data-k="max" data-v="${k}" aria-pressed="${spinOpt.max===k}">${l}</button>`).join('')}</div>
+    <div class="chips wrap" role="group" aria-label="Film or TV">${[['any','Film or TV'],['film','A film'],['tv','A TV show']].map(([k,l])=>`<button class="chip" data-act="spinopt" data-k="kind" data-v="${k}" aria-pressed="${spinOpt.kind===k}">${l}</button>`).join('')}</div>
+    <div class="chips wrap" role="group" aria-label="Length">${(spinOpt.kind==='tv'?TV_LENGTHS:LENGTHS).map(([k,l])=>`<button class="chip" data-act="spinopt" data-k="max" data-v="${k}" aria-pressed="${spinOpt.max===k}">${l}</button>`).join('')}</div>
     <div class="chips wrap" role="group" aria-label="Mood"><button class="chip" data-act="spinopt" data-k="mood" data-v="" aria-pressed="${!spinOpt.mood}">Any mood</button>${Object.keys(MOODS).map(k=>`<button class="chip" data-act="spinopt" data-k="mood" data-v="${k}" aria-pressed="${spinOpt.mood===k}">${esc(MOODS[k])}</button>`).join('')}</div>
     ${myServices().length?`<label class="chk"><input type="checkbox" id="spin-mine" ${spinOpt.mine?'checked':''}> Only films on our services</label>`:''}
     ${f?`<div class="reveal panel" style="gap:12px">${artHtml(f,'hero')}<h3 style="font-size:22px">${esc(f.t)}</h3><span class="small muted num">${esc(factsText(f))} · ${esc(genreText(f))}</span>${f.b?`<p class="muted">${esc(f.b)}</p>`:''}<div class="svcs">${svcTags(f)}</div>
@@ -447,10 +582,10 @@ function rateSheet(id){const f=getFilm(id); if(!f) return; const draw=()=>`<h2>H
 function renderSeen(){
   const v=$('#view-seen'), ids=Object.keys(state.watched).filter(getFilm).sort((a,b)=>state.watched[b].t-state.watched[a].t);
   if(!ids.length){v.innerHTML=`<div class="empty" style="min-height:62vh"><h2>No films watched yet</h2><p>Tap "We watched it" on tonight's film, or swipe down on a card you've already seen.</p><button class="btn primary" data-tab="swipe">Start swiping</button></div>`; return;}
-  const films=ids.map(getFilm), mins=films.reduce((a,f)=>a+(f.m||0),0), rated=ids.filter(id=>state.watched[id].r), avg=rated.length?rated.reduce((a,id)=>a+state.watched[id].r,0)/rated.length:0;
+  const films=ids.map(getFilm), nf=films.filter(f=>kindOf(f)==='film').length, rated=ids.filter(id=>state.watched[id].r), avg=rated.length?rated.reduce((a,id)=>a+state.watched[id].r,0)/rated.length:0;
   const gc={}; films.forEach(f=>(f.g||[]).forEach(g=>gc[g]=(gc[g]||0)+1)); const topG=Object.keys(gc).sort((a,b)=>gc[b]-gc[a])[0];
   const fmt=t=>new Date(t).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  v.innerHTML=`<div class="stats"><div><b class="num">${ids.length}</b><span>films</span></div><div><b class="num">${Math.round(mins/60)}</b><span>hours</span></div><div><b class="num">${avg?avg.toFixed(1):'–'}</b><span>avg stars</span></div><div><b>${topG&&GENRES[topG]?esc(GENRES[topG][0]):'–'}</b><span>top genre</span></div></div>
+  v.innerHTML=`<div class="stats"><div><b class="num">${nf}</b><span>films</span></div><div><b class="num">${ids.length-nf}</b><span>TV shows</span></div><div><b class="num">${avg?avg.toFixed(1):'–'}</b><span>avg stars</span></div><div><b>${topG&&GENRES[topG]?esc(GENRES[topG][0]):'–'}</b><span>top genre</span></div></div>
     ${ids.map(id=>{const f=getFilm(id), w=state.watched[id]; return filmRow(f,{side:`<span class="small muted num">${esc(fmt(w.t))}</span>`,actions:`${starsHtml(id)}<span style="flex:1"></span><button class="x-btn" data-act="watchagain" data-id="${esc(id)}">Watch again</button><button class="x-btn" data-act="unseen" data-id="${esc(id)}">Remove</button>`});}).join('')}`;}
 
 /* ------------------------------------------------------------------
@@ -458,13 +593,14 @@ function renderSeen(){
    ------------------------------------------------------------------ */
 let browseQ='', browseMode='all';
 function browseListHtml(){const q=browseQ.trim().toLowerCase();
-  let list=allFilms().filter(f=>browseMode==='all'||(browseMode==='mine'&&onMine(f))||(browseMode==='own'&&f.own)||(browseMode==='found'&&f.tmdb&&!f.own));
+  let list=modeFilms().filter(f=>browseMode==='all'||(browseMode==='mine'&&onMine(f))||(browseMode==='own'&&f.own)||(browseMode==='found'&&f.tmdb&&!f.own));
   if(q) list=list.filter(f=>(f.t+' '+(f.d||'')+' '+genreText(f)+' '+f.y).toLowerCase().includes(q));
   list.sort((a,b)=>a.t.replace(/^(the|a|an)\s+/i,'').localeCompare(b.t.replace(/^(the|a|an)\s+/i,'')));
   return list.length?list.map(f=>filmRow(f,{side:inWatch(f.id)?'<span class="pill">Watchlist</span>':state.watched[f.id]?'<span class="pill plain">Seen</span>':''})).join(''):'<p class="muted">No films match.</p>';}
 function renderBrowse(){
   const v=$('#view-browse'), modes=[['all','All'],['mine','On my services'],['own','Added by me'],['found','Found on TMDB']];
-  v.innerHTML=`<input class="search" id="browse-q" type="search" placeholder="Search ${allFilms().length} films, directors, genres" value="${esc(browseQ)}" aria-label="Search films">
+  const nm=modeFilms().length;
+  v.innerHTML=`<input class="search" id="browse-q" type="search" placeholder="Search ${nm} ${noun(state.mode,nm)}, ${state.mode==='tv'?'creators':'directors'}, genres" value="${esc(browseQ)}" aria-label="Search">
     <div class="chips" role="group" aria-label="Show">${modes.map(([k,l])=>`<button class="chip" data-act="bmode" data-v="${k}" aria-pressed="${browseMode===k}">${l}</button>`).join('')}</div>
     <div class="row"><button class="btn sm" data-act="addfilm">Add a film</button><button class="btn sm" data-act="tmdb">${tmdbKey()?'Find more on TMDB':'Live updates (TMDB)'}</button></div>
     <div id="browse-list" style="display:flex;flex-direction:column;gap:10px">${browseListHtml()}</div>`;
@@ -478,7 +614,8 @@ function openFilm(id,from){const f=getFilm(id); if(!f) return;
     const deckBtns=from==='deck'?`<div class="row sticky-actions"><button class="btn" data-act="dskip">${ICON.x} Skip</button><button class="btn" data-act="dseen">${ICON.eye} Seen it</button><button class="btn primary" data-act="dpick">${ICON.heart} Watchlist</button></div>`:'';
     return `${artHtml(f,'hero')}
     <h2>${esc(f.t)}</h2>
-    <div class="small muted num">${esc(factsText(f))}${f.d?' · '+esc(f.d):''}</div>
+    <div class="small muted num">${esc(factsText(f))}${f.d?' · '+(kindOf(f)==='tv'?'Created by ':'')+esc(f.d):''}</div>
+    ${kindOf(f)==='tv'?`<p class="small"><b>${esc(seasonsText(f)||'Seasons unknown')}</b>${f.ye?' · finished':' · still running'}${f.m?` · episodes about ${f.m} min`:''}</p>`:''}
     <div class="svcs">${(f.g||[]).map(g=>`<span class="pill plain">${esc(GENRES[g]?GENRES[g][0]:g)}</span>`).join('')}${(f.mo||[]).map(m=>`<span class="pill gold">${esc(MOODS[m]||m)}</span>`).join('')}</div>
     ${f.b?`<p>${esc(f.b)}</p>`:''}
     <div class="panel"><b>Where to watch in the UK</b><div class="svcs">${svcTags(f)}</div>
@@ -490,7 +627,7 @@ function openFilm(id,from){const f=getFilm(id); if(!f) return;
       <div class="row"><button class="btn sm ghost" data-act="editsvc" data-id="${esc(f.id)}">Change services</button>${tmdbKey()?`<button class="btn sm ghost" data-act="refreshone" data-id="${esc(f.id)}">Check live now</button>`:''}</div></div>
     ${w?`<div class="panel"><b>You watched this</b>${starsHtml(f.id)}</div>`:''}
     ${from!=='deck'?`<div class="row">${inWatch(f.id)?`<button class="btn" data-act="unwatch" data-id="${esc(f.id)}">Remove from watchlist</button>`:`<button class="btn" data-act="addwatch" data-id="${esc(f.id)}">${ICON.heart} Add to watchlist</button>`}
-      <button class="btn" data-act="settonight" data-id="${esc(f.id)}" data-close="1">Watch tonight</button>${w?'':`<button class="btn" data-act="markwatched" data-id="${esc(f.id)}">Watched it</button>`}</div>`:''}
+      <button class="btn" data-act="settonight" data-id="${esc(f.id)}" data-close="1">Watch tonight</button>${w?'':`<button class="btn" data-act="markwatched" data-id="${esc(f.id)}">${kindOf(f)==='tv'?'Finished it':'Watched it'}</button>`}</div>`:''}
     ${f.own?`<div class="row"><button class="btn sm" data-act="editfilm" data-id="${esc(f.id)}">Edit film</button><button class="btn sm ghost" data-act="delfilm" data-id="${esc(f.id)}">Delete film</button></div>`:''}
     ${f.tmdb&&!f.own?'<p class="note">Film details from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>':''}
     ${deckBtns}`;};
@@ -503,10 +640,13 @@ function svcEditSheet(id){const f=getFilm(id); if(!f) return; const cur=svcOf(f)
     const r=$('#es-reset',b); if(r) r.onclick=()=>{delete state.svcOverride[id]; save(); renderAll(); openFilm(id);};}});}
 
 /* Add or edit your own film */
-function filmForm(id){const f=id?getFilm(id):null;
-  openSheet(`<h2>${f?'Edit film':'Add a film'}</h2>
-    <label class="field">Title<input id="ff-t" value="${esc(f?f.t:'')}" maxlength="120" autocomplete="off"></label>
-    <div class="grid3"><label class="field">Year<input id="ff-y" type="number" inputmode="numeric" min="1900" max="2100" value="${esc(f?f.y:'')}"></label>
+function filmForm(id){const f=id?getFilm(id):null, k0=f?kindOf(f):state.mode;
+  openSheet(`<h2>${f?'Edit':'Add a film or show'}</h2>
+    <div class="grid2"><label class="field">Type<select id="ff-k"><option value="film"${k0==='film'?' selected':''}>Film</option><option value="tv"${k0==='tv'?' selected':''}>TV series</option></select></label>
+      <label class="field">Title<input id="ff-t" value="${esc(f?f.t:'')}" maxlength="120" autocomplete="off"></label></div>
+    <div class="grid3" id="ff-tv" ${k0==='tv'?'':'hidden'}><label class="field">Seasons<input id="ff-se" type="number" inputmode="numeric" min="1" max="99" value="${esc(f&&f.se||'')}"></label>
+      <label class="field">Last year<input id="ff-ye" type="number" inputmode="numeric" min="1900" max="2100" placeholder="Running" value="${esc(f&&f.ye||'')}"></label><span></span></div>
+    <div class="grid3"><label class="field">${k0==='tv'?'First year':'Year'}<input id="ff-y" type="number" inputmode="numeric" min="1900" max="2100" value="${esc(f?f.y:'')}"></label>
       <label class="field">Minutes<input id="ff-m" type="number" inputmode="numeric" min="1" max="600" value="${esc(f?f.m:'')}"></label>
       <label class="field">Certificate<select id="ff-c"><option value="">Not sure</option>${CERTS.map(c=>`<option${f&&f.c===c?' selected':''}>${c}</option>`).join('')}</select></label></div>
     <div class="field">Genres<div class="chips wrap">${Object.keys(GENRES).map(k=>`<label class="chip"><input type="checkbox" name="ffg" value="${k}" ${f&&f.g.includes(k)?'checked':''}>${GENRES[k][0]}</label>`).join('')}</div></div>
@@ -516,12 +656,13 @@ function filmForm(id){const f=id?getFilm(id):null;
     <label class="field">What's it about? (optional)<textarea id="ff-b" maxlength="300">${esc(f?f.b:'')}</textarea></label>
     <div id="ff-err" class="err" role="alert"></div>
     <div class="row sticky-actions"><button class="btn" data-act="close">Cancel</button><button class="btn primary" id="ff-save">${f?'Save changes':'Add film'}</button></div>`,
-  {onMount:b=>{$('#ff-save',b).onclick=()=>{const t=$('#ff-t',b).value.trim(); if(!t){$('#ff-err',b).textContent='Give the film a title.'; return;}
-    const g=$$('input[name=ffg]:checked',b).map(i=>i.value);
-    const film={id:f?f.id:'own-'+Date.now().toString(36),t,y:parseInt($('#ff-y',b).value)||'',m:parseInt($('#ff-m',b).value)||0,c:$('#ff-c',b).value,g:g.length?g:['dra'],
+  {onMount:b=>{$('#ff-k',b).onchange=()=>{$('#ff-tv',b).hidden=$('#ff-k',b).value!=='tv';};
+    $('#ff-save',b).onclick=()=>{const t=$('#ff-t',b).value.trim(); if(!t){$('#ff-err',b).textContent='Give it a title.'; return;}
+    const g=$$('input[name=ffg]:checked',b).map(i=>i.value), kind=$('#ff-k',b).value;
+    const film={id:f?f.id:'own-'+Date.now().toString(36),kind,se:kind==='tv'?(parseInt($('#ff-se',b).value)||0):undefined,ye:kind==='tv'?(parseInt($('#ff-ye',b).value)||0):undefined,t,y:parseInt($('#ff-y',b).value)||'',m:parseInt($('#ff-m',b).value)||0,c:$('#ff-c',b).value,g:g.length?g:['dra'],
       s:$$('input[name=ffs]:checked',b).map(i=>i.value),st:false,mo:$$('input[name=ffo]:checked',b).map(i=>i.value),d:$('#ff-d',b).value.trim(),b:$('#ff-b',b).value.trim(),own:true};
     if(f){const i=state.own.findIndex(x=>x.id===f.id); if(i>=0) state.own[i]=film;} else state.own.push(film);
-    delete state.svcOverride[film.id]; reindex(); save(); renderAll(); openFilm(film.id); toast(f?'Film updated':'Film added');};}});}
+    delete state.svcOverride[film.id]; if(kind!==state.mode){state.mode=kind;} reindex(); save(); renderAll(); openFilm(film.id); toast(f?'Saved':'Added');};}});}
 
 /* ------------------------------------------------------------------
    11. SWIPE TOGETHER
@@ -532,32 +673,38 @@ const TOG_N=28;
 function dayKey(d){d=d||new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
 function svcMask(){let m=0; SERVICES.forEach((s,i)=>{if(myServices().includes(s.k)) m+=2**i;}); return m;}
 function maskNames(m){return SERVICES.filter((s,i)=>Math.floor(m/2**i)%2===1).map(s=>s.n);}
-function togSet(day,mask){const rnd=seededRng(hash('fstog:'+day+':'+mask)), mine=maskNames(mask), keys=SERVICES.filter(s=>mine.includes(s.n)).map(s=>s.k);
+/* Films and TV each have their own daily deck, progress and code (FS1- for films, TV1- for TV). */
+function TG(){if(!state.togs||typeof state.togs!=='object') state.togs={}; return state.togs[state.mode]||null;}
+const TOG_PREFIX={film:'FS1',tv:'TV1'};
+function togSet(day,mask,mode){const rnd=seededRng(hash((mode==='tv'?'fstv:':'fstog:')+day+':'+mask)), mine=maskNames(mask), keys=SERVICES.filter(s=>mine.includes(s.n)).map(s=>s.k);
   const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a;};
-  const on=shuffle(BUILT.filter(f=>f.s.some(k=>keys.includes(k))).map(f=>f.id)), rest=shuffle(BUILT.filter(f=>!f.s.some(k=>keys.includes(k))).map(f=>f.id));
+  const src=mode==='tv'?BUILT_TV:BUILT_FILMS;
+  const on=shuffle(src.filter(f=>f.s.some(k=>keys.includes(k))).map(f=>f.id)), rest=shuffle(src.filter(f=>!f.s.some(k=>keys.includes(k))).map(f=>f.id));
   return on.concat(rest).slice(0,TOG_N);}
-function togOn(){return !!(state.tog&&state.tog.active);}
-function ensureTog(){const day=dayKey(), mask=svcMask(), key=day+'-'+mask.toString(36);
-  if(!state.tog||state.tog.key!==key) state.tog={active:!!(state.tog&&state.tog.active),key,day,mask,ids:togSet(day,mask),dec:{},hist:[],matches:null,theirs:0};}
-function togLeft(){return state.tog.ids.filter(id=>!state.tog.dec[id]);}
-function togLikes(){return state.tog.ids.filter(id=>state.tog.dec[id]==='R');}
+function togOn(){return !!(TG()&&TG().active);}
+function ensureTog(){const day=dayKey(), mask=svcMask(), key=day+'-'+mask.toString(36), cur=TG();
+  if(!cur||cur.key!==key) state.togs[state.mode]={active:!!(cur&&cur.active),key,day,mask,ids:togSet(day,mask,state.mode),dec:{},hist:[],matches:null,theirs:0};}
+function togLeft(){return TG().ids.filter(id=>!TG().dec[id]);}
+function togLikes(){return TG().ids.filter(id=>TG().dec[id]==='R');}
 function togCheck(ids){return hash(ids.join(',')).toString(36).slice(0,4);}
-function togCode(){const T=state.tog; let bits=0; T.ids.forEach((id,i)=>{if(T.dec[id]==='R') bits+=2**i;}); return `FS1-${T.day}-${T.mask.toString(36)}-${togCheck(T.ids)}-${bits.toString(36)}`;}
+function togCode(){const T=TG(); let bits=0; T.ids.forEach((id,i)=>{if(T.dec[id]==='R') bits+=2**i;}); return `${TOG_PREFIX[state.mode]}-${T.day}-${T.mask.toString(36)}-${togCheck(T.ids)}-${bits.toString(36)}`;}
 function readTogCode(txt){
-  const m=String(txt||'').match(/FS1-(\d{8})-([a-z0-9]+)-([a-z0-9]{1,4})-([a-z0-9]+)/i); if(!m) return {err:'That doesn\u2019t look like a Film Swipe code. Paste the whole thing, starting FS1-.'};
-  const T=state.tog;
-  if(m[1]!==T.day){const d=m[1]; return {err:`That code is for ${+d.slice(6)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+d.slice(4,6)-1]}. You both need to swipe the same day\u2019s ${TOG_N} films. Ask for today\u2019s code.`};}
-  const theirMask=parseInt(m[2],36);
-  if(theirMask!==T.mask){const t=maskNames(theirMask), mine=maskNames(T.mask); return {err:`You have different services ticked, so you swiped different films. Theirs: ${t.join(', ')||'none'}. Yours: ${mine.join(', ')||'none'}. Tick the same services (Settings), then both swipe again.`};}
-  if(m[3].toLowerCase()!==togCheck(T.ids)) return {err:'Your apps have different film lists. Make sure you\u2019re both on the latest version, then swipe again.'};
-  const bits=parseInt(m[4],36); if(!(bits>=0)) return {err:'That code is damaged. Copy it again.'};
+  const nn=noun(state.mode,2), pre=TOG_PREFIX[state.mode];
+  const m=String(txt||'').match(/(FS1|TV1)-(\d{8})-([a-z0-9]+)-([a-z0-9]{1,4})-([a-z0-9]+)/i); if(!m) return {err:`That doesn\u2019t look like a Swipe together code. Paste the whole thing, starting ${pre}-.`};
+  if(m[1].toUpperCase()!==pre) return {err:m[1].toUpperCase()==='TV1'?'That code is for TV shows. Tap TV at the top, swipe today\u2019s 28 shows, then paste it again.':'That code is for films. Tap Films at the top, swipe today\u2019s 28 films, then paste it again.'};
+  const T=TG();
+  if(m[2]!==T.day){const d=m[2]; return {err:`That code is for ${+d.slice(6)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+d.slice(4,6)-1]}. You both need to swipe the same day\u2019s ${TOG_N} ${nn}. Ask for today\u2019s code.`};}
+  const theirMask=parseInt(m[3],36);
+  if(theirMask!==T.mask){const t=maskNames(theirMask), mine=maskNames(T.mask); return {err:`You have different services ticked, so you swiped different ${nn}. Theirs: ${t.join(', ')||'none'}. Yours: ${mine.join(', ')||'none'}. Tick the same services (Settings), then both swipe again.`};}
+  if(m[4].toLowerCase()!==togCheck(T.ids)) return {err:`Your apps have different ${nn} lists. Make sure you\u2019re both on the latest version, then swipe again.`};
+  const bits=parseInt(m[5],36); if(!(bits>=0)) return {err:'That code is damaged. Copy it again.'};
   return {likes:T.ids.filter((id,i)=>Math.floor(bits/2**i)%2===1)};}
-function startTogether(){ensureTog(); state.tog.active=true; save(); closeSheet(); setTab('swipe');}
+function startTogether(){ensureTog(); TG().active=true; save(); closeSheet(); setTab('swipe');}
 function togHeader(){const done=TOG_N-togLeft().length;
-  return `<div class="tog-strip"><div style="min-width:0"><b>Swipe together</b><div class="small muted num">${done} of ${TOG_N} · the same ${TOG_N} films for both of you today</div></div><button class="btn sm" data-act="togexit">Exit</button></div>
+  return `<div class="tog-strip"><div style="min-width:0"><b>Swipe together · ${state.mode==='tv'?'TV':'Films'}</b><div class="small muted num">${done} of ${TOG_N} · the same ${TOG_N} ${noun(state.mode,2)} for both of you today</div></div><button class="btn sm" data-act="togexit">Exit</button></div>
     <div class="bar"><i style="width:${Math.round(done/TOG_N*100)}%"></i></div>`;}
 function canShare(){try{return !!navigator.share&&window.self===window.top;}catch(e){return false;}}
-function togDoneHtml(){const T=state.tog, mine=togLikes();
+function togDoneHtml(){const T=TG(), mine=togLikes();
   return `<div class="tog-done">
     <h2>All ${TOG_N} swiped</h2><p class="muted">You liked ${mine.length}. Send your code and paste theirs once they've swiped all ${TOG_N} too.</p>
     <div class="panel"><b>1. Send your code</b><code class="code-box num">${esc(togCode())}</code>
@@ -570,7 +717,7 @@ function togDoneHtml(){const T=state.tog, mine=togLikes();
     ${T.matches?`<div class="section-title">You both liked · ${T.matches.length}</div>
       ${T.matches.length?T.matches.map(id=>{const f=getFilm(id); return f?filmRow(f,{side:inWatch(id)?'<span class="pill">Watchlist</span>':''}):'';}).join('')
         +`<div class="row"><button class="btn primary" data-act="togpick">Pick one for tonight</button><button class="btn" data-act="togadd">Add all to watchlist</button></div>`
-        :`<p class="small muted">No films in common today. They liked ${T.theirs}, you liked ${mine.length}. Try tomorrow's ${TOG_N}, or swipe the normal deck.</p>`}`:''}
+        :`<p class="small muted">No ${noun(state.mode,2)} in common today. They liked ${T.theirs}, you liked ${mine.length}. Try tomorrow's ${TOG_N}, or swipe the normal deck.</p>`}`:''}
     <div class="row"><button class="btn ghost" data-act="togredo">Swipe today's ${TOG_N} again</button><button class="btn ghost" data-act="togexit">Back to my deck</button></div>
   </div>`;}
 
@@ -594,19 +741,28 @@ function tmErr(e){const m=(e&&e.message)||'';
     m==='offline'?(framed?'Live updates can\u2019t reach TMDB from inside claude.ai. Use your GitHub version of the app for this.':'Couldn\u2019t reach TMDB. Check your internet connection.'):'Something went wrong talking to TMDB ('+m+').';}
 async function ensureProviders(force){
   if(!force&&state.tm.prov&&Date.now()-state.tm.provT<30*864e5) return state.tm.prov;
-  const res=await tmdb('/watch/providers/movie',{watch_region:'GB',language:'en-GB'}), map={};
-  allServices().forEach(s=>{map[s.k]=(res.results||[]).filter(p=>s.re.test(p.provider_name)).map(p=>p.provider_id);});
+  const [mv,tv]=await Promise.all([tmdb('/watch/providers/movie',{watch_region:'GB',language:'en-GB'}),tmdb('/watch/providers/tv',{watch_region:'GB',language:'en-GB'})]);
+  const all=[...(mv.results||[]),...(tv.results||[])], map={};
+  allServices().forEach(s=>{map[s.k]=[...new Set(all.filter(p=>s.re.test(p.provider_name)).map(p=>p.provider_id))];});
   state.tm.prov=map; state.tm.provT=Date.now(); save(); return map;}
 function liveFrom(d){const gb=((d['watch/providers']||{}).results||{}).GB||{}, list=[...(gb.flatrate||[]),...(gb.free||[]),...(gb.ads||[])];
   return {svc:allServices().filter(s=>list.some(p=>s.re.test(p.provider_name))).map(s=>s.k),t:Date.now(),link:gb.link||'',poster:d.poster_path||'',tmdb:d.id,names:[...new Set(list.map(p=>p.provider_name))]};}
-function certFrom(d){const r=((d.release_dates||{}).results||[]).find(x=>x.iso_3166_1==='GB'); let c=r?(r.release_dates||[]).map(x=>x.certification).find(Boolean)||'':''; c=c.replace('12A','12'); return CERTS.includes(c)?c:'';}
-const details=tid=>tmdb('/movie/'+tid,{append_to_response:'watch/providers,release_dates',language:'en-GB'});
+function certFrom(d){let c='';
+  if(d.content_ratings){const r=(d.content_ratings.results||[]).find(x=>x.iso_3166_1==='GB'); c=r?r.rating||'':'';}
+  else{const r=((d.release_dates||{}).results||[]).find(x=>x.iso_3166_1==='GB'); c=r?(r.release_dates||[]).map(x=>x.certification).find(Boolean)||'':'';}
+  c=String(c).toUpperCase().replace('12A','12'); return CERTS.includes(c)?c:'';}
+const details=(tid,kind)=>kind==='tv'?tmdb('/tv/'+tid,{append_to_response:'watch/providers,content_ratings',language:'en-GB'})
+  :tmdb('/movie/'+tid,{append_to_response:'watch/providers,release_dates',language:'en-GB'});
+function tvFields(d){const ended=/ended|canceled|cancelled/i.test(d.status||''), ep=(d.episode_run_time||[])[0]||((d.last_episode_to_air||{}).runtime)||0;
+  return {se:d.number_of_seasons||0,ye:ended?(parseInt(String(d.last_air_date||'').slice(0,4))||0):0,m:ep};}
 async function tmdbIdFor(f){if(f.tmdb) return f.tmdb; if(state.tmIds[f.id]) return state.tmIds[f.id];
-  let res=await tmdb('/search/movie',{query:f.t,year:f.y||'',include_adult:'false',language:'en-GB'}); let r=(res.results||[]);
-  if(!r.length&&f.y){res=await tmdb('/search/movie',{query:f.t,include_adult:'false',language:'en-GB'}); r=res.results||[];}
-  const hit=r.find(x=>String(x.release_date||'').startsWith(String(f.y)))||r[0]; if(!hit) return 0; state.tmIds[f.id]=hit.id; return hit.id;}
-async function refreshFilm(f){const tid=await tmdbIdFor(f); if(!tid) return false; const d=await details(tid); state.live[f.id]=liveFrom(d);
-  if(f.tmdb&&!f.own){f.m=d.runtime||f.m; f.c=certFrom(d)||f.c;} return true;}
+  const tv=kindOf(f)==='tv', path=tv?'/search/tv':'/search/movie', yk=tv?'first_air_date_year':'year', dk=tv?'first_air_date':'release_date';
+  let res=await tmdb(path,{query:f.t,[yk]:f.y||'',include_adult:'false',language:'en-GB'}); let r=(res.results||[]);
+  if(!r.length&&f.y){res=await tmdb(path,{query:f.t,include_adult:'false',language:'en-GB'}); r=res.results||[];}
+  const hit=r.find(x=>String(x[dk]||'').startsWith(String(f.y)))||r[0]; if(!hit) return 0; state.tmIds[f.id]=hit.id; return hit.id;}
+async function refreshFilm(f){const tid=await tmdbIdFor(f); if(!tid) return false; const kind=kindOf(f), d=await details(tid,kind); state.live[f.id]=liveFrom(d);
+  if(kind==='tv'&&!f.own){const tf=tvFields(d); state.live[f.id].tv=tf; if(tf.se) f.se=tf.se; f.ye=tf.ye; if(tf.m) f.m=tf.m; if(f.tmdb) f.c=certFrom(d)||f.c;}
+  else if(f.tmdb&&!f.own){f.m=d.runtime||f.m; f.c=certFrom(d)||f.c;} return true;}
 async function runPool(items,n,fn,onProg){let i=0,done=0,fatal=null;
   const worker=async()=>{while(i<items.length&&!fatal){const it=items[i++]; try{await fn(it);}catch(e){if(['badkey','offline','nokey'].includes(e.message)) fatal=e;} done++; onProg&&onProg(done,items.length);}};
   await Promise.all(Array.from({length:Math.min(n,items.length)},worker)); if(fatal) throw fatal;}
@@ -615,30 +771,36 @@ function tmProg(t){const p=$('#tm-prog'); if(p) p.textContent=t;}
 async function refreshMany(films,label){if(tmBusy) return; tmBusy=true; tmProg(`Checking ${plural(films.length,'film')}…`);
   try{await ensureProviders(); let ok=0; await runPool(films,4,async f=>{if(await refreshFilm(f)) ok++;},(d,n)=>tmProg(`${label}: ${d} of ${n}`)); save(); renderAll(); tmProg(`Done. Updated ${plural(ok,'film')}.`); toast(`Updated ${plural(ok,'film')}`);}
   catch(e){tmProg(tmErr(e)); toast(tmErr(e));} finally{tmBusy=false; save();}}
-async function findMore(){if(tmBusy) return; tmBusy=true; tmProg('Looking for films on your services…');
+/* TMDB's TV genres differ from its film genres; each maps to one or more of ours. */
+const TMDB_TV_GENRES={10759:['act','adv'],16:['ani'],35:['com'],80:['cri'],99:['doc'],18:['dra'],10751:['fam'],10762:['fam'],9648:['mys'],10764:['rea'],10765:['sci','fan'],10768:['war'],37:['wes']};
+async function findMore(){if(tmBusy) return; tmBusy=true; const mode=state.mode, tv=mode==='tv', nn=noun(mode,2); tmProg(`Looking for ${nn} on your services…`);
   try{const prov=await ensureProviders(), mine=myServices(); const ids=[...new Set(mine.flatMap(k=>prov[k]||[]))];
     if(!ids.length) throw new Error(mine.length?'noprov':'nosvc');
-    const f=state.filters, gids=Object.keys(TMDB_GENRES).filter(k=>f.genres.includes(TMDB_GENRES[k]));
-    const q=[ids.join('|'),gids.join('|'),f.maxCert].join('/'); if(state.tm.q!==q){state.tm.q=q; state.tm.page=0;}
-    const page=(state.tm.page||0)+1, params={watch_region:'GB',with_watch_providers:ids.join('|'),with_watch_monetization_types:'flatrate|free|ads',sort_by:'popularity.desc','vote_count.gte':'150',include_adult:'false',language:'en-GB',page:String(page)};
-    if(gids.length) params.with_genres=gids.join('|'); if(f.maxCert){params.certification_country='GB'; params['certification.lte']=f.maxCert;}
-    const res=await tmdb('/discover/movie',params);
-    const known=new Set([...Object.values(state.tmIds),...state.found.map(x=>x.tmdb),...Object.values(state.live).map(x=>x.tmdb)]);
-    const titleKey=(t,y)=>t.toLowerCase().replace(/[^a-z0-9]/g,'')+':'+y; const builtKeys=new Set(BUILT.concat(state.own).map(x=>titleKey(x.t,x.y)));
-    const fresh=(res.results||[]).filter(r=>!known.has(r.id)&&!builtKeys.has(titleKey(r.title||'',String(r.release_date||'').slice(0,4)*1||'')));
+    const f=state.filters, gids=tv?Object.keys(TMDB_TV_GENRES).filter(k=>TMDB_TV_GENRES[k].some(g=>f.genres.includes(g))):Object.keys(TMDB_GENRES).filter(k=>f.genres.includes(TMDB_GENRES[k]));
+    const q=[mode,ids.join('|'),gids.join('|'),tv?'':f.maxCert].join('/'); const pages=state.tm.pages||(state.tm.pages={});
+    const page=(pages[q]||0)+1, params={watch_region:'GB',with_watch_providers:ids.join('|'),with_watch_monetization_types:'flatrate|free|ads',sort_by:'popularity.desc','vote_count.gte':tv?'80':'150',include_adult:'false',language:'en-GB',page:String(page)};
+    if(gids.length) params.with_genres=gids.join('|'); if(!tv&&f.maxCert){params.certification_country='GB'; params['certification.lte']=f.maxCert;}
+    const res=await tmdb(tv?'/discover/tv':'/discover/movie',params);
+    const same=allFilms().filter(x=>kindOf(x)===mode);
+    const known=new Set(same.map(x=>x.tmdb||state.tmIds[x.id]||(state.live[x.id]||{}).tmdb).filter(Boolean));
+    const titleKey=(t,y)=>String(t).toLowerCase().replace(/[^a-z0-9]/g,'')+':'+y; const builtKeys=new Set(same.map(x=>titleKey(x.t,x.y)));
+    const fresh=(res.results||[]).filter(r=>!known.has(r.id)&&!builtKeys.has(titleKey(tv?r.name||'':r.title||'',parseInt(String((tv?r.first_air_date:r.release_date)||'').slice(0,4))||'')));
     let added=0;
-    await runPool(fresh,4,async r=>{const d=await details(r.id), g=(d.genres||[]).map(x=>TMDB_GENRES[x.id]).filter(Boolean);
-      const film={id:'t'+d.id,t:d.title||r.title,y:parseInt(String(d.release_date||'').slice(0,4))||'',m:d.runtime||0,c:certFrom(d),g:g.length?g:['dra'],s:[],st:false,mo:moodsFor(g),d:'',b:String(d.overview||'').slice(0,240),tmdb:d.id,poster:d.poster_path||''};
-      state.live[film.id]=liveFrom(d); state.found.push(film); added++;},(d,n)=>tmProg(`Adding films: ${d} of ${n}`));
-    state.tm.page=page; reindex(); save(); renderAll();
-    const msg=added?`Added ${plural(added,'new film')} to your deck.`:(page<(res.total_pages||1)?'Nothing new on that page. Tap again for more.':'No more films found for these filters.');
+    await runPool(fresh,4,async r=>{const d=await details(r.id,mode);
+      const g=tv?[...new Set((d.genres||[]).flatMap(x=>TMDB_TV_GENRES[x.id]||[]))]:(d.genres||[]).map(x=>TMDB_GENRES[x.id]).filter(Boolean);
+      const base={t:(tv?d.name||r.name:d.title||r.title),c:certFrom(d),g:g.length?g:['dra'],s:[],st:false,mo:moodsFor(g),d:'',b:String(d.overview||'').slice(0,240),tmdb:d.id,poster:d.poster_path||''};
+      const film=tv?Object.assign({id:'tvt'+d.id,kind:'tv',y:parseInt(String(d.first_air_date||'').slice(0,4))||''},tvFields(d),base,{d:(d.created_by||[]).map(x=>x.name).slice(0,3).join(', ')})
+        :Object.assign({id:'t'+d.id,kind:'film',y:parseInt(String(d.release_date||'').slice(0,4))||'',m:d.runtime||0},base);
+      state.live[film.id]=liveFrom(d); state.found.push(film); added++;},(d,n)=>tmProg(`Adding ${nn}: ${d} of ${n}`));
+    pages[q]=page; reindex(); save(); renderAll();
+    const msg=added?`Added ${added} new ${noun(mode,added)} to your deck.`:(page<(res.total_pages||1)?'Nothing new on that page. Tap again for more.':`No more ${nn} found for these filters.`);
     tmProg(msg); toast(msg);}
   catch(e){const m=e.message==='nosvc'?'Choose your services first (Settings).':e.message==='noprov'?'TMDB doesn\u2019t list your services for the UK.':tmErr(e); tmProg(m); toast(m);}
   finally{tmBusy=false;}}
 function moodsFor(g){const m=[]; if(g.includes('com')) m.push('laugh'); if(g.includes('fam')||g.includes('ani')) m.push('kids'); if(g.includes('thr')||g.includes('hor')) m.push('edge'); if(g.includes('rom')) m.push('date'); if(g.includes('sci')&&g.includes('mys')) m.push('mind'); return m;}
 function tmdbSheet(){const draw=()=>{const key=tmdbKey(), watchFilms=state.watch.map(w=>getFilm(w.id)).filter(Boolean);
   return `<h2>Live where-to-watch</h2>
-    <p class="muted">The built-in list is a best guess and films move between services every month. Add a free TMDB key to check what's on your services today, and to find more films to swipe.</p>
+    <p class="muted">The built-in list is a best guess, and films and shows move between services every month. Add a free TMDB key to check what's on your services today, and to find more films and TV shows to swipe.</p>
     ${framed?'<p class="small err">Live updates don\u2019t work inside claude.ai. Use your GitHub version of the app for this.</p>':''}
     <div class="panel"><label class="field" for="tm-key">TMDB API key or Read Access Token<input id="tm-key" type="password" autocomplete="off" spellcheck="false" value="${esc(key)}" placeholder="Paste your key"></label>
       <div class="row"><button class="btn primary" id="tm-save">Save and test</button>${key?'<button class="btn" id="tm-del">Remove key</button>':''}</div>
@@ -646,8 +808,9 @@ function tmdbSheet(){const draw=()=>{const key=tmdbKey(), watchFilms=state.watch
       <p class="note">Your key stays on this device. It is only sent to TMDB and is never included in backups or codes.</p></div>
     ${key?`<div class="panel"><b>Update</b>
       <button class="btn" data-act="refreshwatch" ${watchFilms.length?'':'disabled'}>Check my watchlist (${plural(watchFilms.length,'film')})</button>
-      <button class="btn" data-act="refreshall">Check every film (${allFilms().length}, about a minute)</button>
-      <button class="btn" data-act="findmore">Find more films on my services</button>
+      <button class="btn" data-act="refreshall">Check every film and show (${allFilms().length}, about a minute)</button>
+      <button class="btn" data-act="findmore">Find more ${state.mode==='tv'?'TV shows':'films'} on my services</button>
+      <p class="note">Switch Films / TV at the top of the app to choose which kind "Find more" looks for.</p>
       <label class="chk"><input type="checkbox" id="tm-posters" ${state.settings.posters?'checked':''}> Show film posters from TMDB (instead of title cards)</label>
       <p class="note" id="tm-prog" role="status">${esc(state.tm.status||'')}</p></div>`:''}
     <details class="panel"><summary><b>How to get a free TMDB key</b></summary><ol class="steps">
@@ -675,7 +838,7 @@ function servicesSheet(first){const draw=()=>`<h2>${first?'Which services do you
     <button class="btn primary block" data-act="svcdone">${first?'Start swiping':'Done'}</button>`;
   const mount=b=>{const c=$('#only-mine',b); if(c) c.onchange=()=>{state.settings.onlyMine=c.checked; save(); renderAll();};};
   openSheet(draw(),{ctx:{redraw:()=>sheetRedraw(draw,mount)},onMount:mount});}
-function filterSheet(){const draw=()=>{const f=state.filters, n=deck().length;
+function filterSheet(){const draw=()=>{const f=state.filters, n=deck().length, tv=state.mode==='tv';
   const multi=(k,obj)=>Object.keys(obj).map(x=>`<button class="chip" data-act="fmulti" data-k="${k}" data-v="${x}" aria-pressed="${f[k].includes(x)}">${esc(Array.isArray(obj[x])?obj[x][0]:obj[x])}</button>`).join('');
   return `<h2>Filters</h2>
     <div class="section-title">Services</div>
@@ -683,11 +846,14 @@ function filterSheet(){const draw=()=>{const f=state.filters, n=deck().length;
     <label class="chk"><input type="checkbox" id="f-only" ${state.settings.onlyMine?'checked':''}> Only films on my services</label>
     <div class="section-title">Genre</div><div class="chips wrap">${multi('genres',GENRES)}</div>
     <div class="section-title">Mood</div><div class="chips wrap">${multi('moods',MOODS)}</div>
-    <div class="section-title">Length</div><div class="chips wrap">${LENGTHS.map(([v,l])=>`<button class="chip" data-act="fset" data-k="maxMins" data-v="${v}" aria-pressed="${f.maxMins===v}">${l}</button>`).join('')}</div>
-    <div class="section-title">Certificate up to</div><div class="chips wrap"><button class="chip" data-act="fcert" data-v="" aria-pressed="${!f.maxCert}">Any</button>${CERTS.slice(0,4).map(c=>`<button class="chip" data-act="fcert" data-v="${c}" aria-pressed="${f.maxCert===c}">${c}</button>`).join('')}</div>
+    <div class="section-title">${tv?'Episode length':'Length'}</div><div class="chips wrap">${(tv?TV_LENGTHS:LENGTHS).map(([v,l])=>`<button class="chip" data-act="fset" data-k="maxMins" data-v="${v}" aria-pressed="${f.maxMins===v}">${l}</button>`).join('')}</div>
+    ${tv?`<div class="section-title">Seasons</div><div class="chips wrap">${SEASONS.map(([v,l])=>`<button class="chip" data-act="fset" data-k="maxSeasons" data-v="${v}" aria-pressed="${f.maxSeasons===v}">${l}</button>`).join('')}</div>
+      <label class="chk"><input type="checkbox" id="f-ended" ${f.ended?'checked':''}> Only shows that have finished (no waiting for the next season)</label>`:''}
+    <div class="section-title">${tv?'Age rating up to':'Certificate up to'}</div><div class="chips wrap"><button class="chip" data-act="fcert" data-v="" aria-pressed="${!f.maxCert}">Any</button>${CERTS.slice(0,4).map(c=>`<button class="chip" data-act="fcert" data-v="${c}" aria-pressed="${f.maxCert===c}">${c}</button>`).join('')}</div>
     <div class="section-title">Decade</div><div class="chips wrap">${DECADES.map(([v,l])=>`<button class="chip" data-act="fmulti" data-k="decades" data-v="${v}" aria-pressed="${f.decades.includes(v)}">${l}</button>`).join('')}</div>
-    <div class="row sticky-actions"><button class="btn" data-act="clearfilters">Clear all</button><button class="btn primary" data-act="close">Show ${plural(n,'film')}</button></div>`;};
-  const mount=b=>{const c=$('#f-only',b); if(c) c.onchange=()=>{state.settings.onlyMine=c.checked; save(); renderAll();};};
+    <div class="row sticky-actions"><button class="btn" data-act="clearfilters">Clear all</button><button class="btn primary" data-act="close">Show ${n} ${noun(state.mode,n)}</button></div>`;};
+  const mount=b=>{const c=$('#f-only',b); if(c) c.onchange=()=>{state.settings.onlyMine=c.checked; save(); renderAll();};
+    const e=$('#f-ended',b); if(e) e.onchange=()=>{state.filters.ended=e.checked; save(); renderAll();};};
   openSheet(draw(),{ctx:{redraw:()=>sheetRedraw(draw,mount)},onMount:mount});}
 function settingsSheet(){
   openSheet(`<h2>Settings</h2>
@@ -695,11 +861,11 @@ function settingsSheet(){
     <div class="panel"><b>Live where-to-watch (TMDB)</b><p class="note">${tmdbKey()?'Your key is saved. Check films, find more, or turn on posters.':'Optional. Add a free TMDB key to check what\u2019s on each service today.'}</p><button class="btn" data-act="tmdb">${tmdbKey()?'Open live updates':'Set up live updates'}</button></div>
     <div class="panel"><b>Swipe together</b><p class="note">Both swipe the same ${TOG_N} films today, then swap codes to see your matches. Tick the same services on both phones.</p><button class="btn" data-act="together">Start Swipe together</button></div>
     <div class="panel"><b>Backup and moving phones</b><p class="note">Copy a backup code to keep your watchlist, ratings and films, or move them to another phone.</p><button class="btn" data-act="backup">Backup or restore</button></div>
-    <div class="panel"><b>About the film list</b><p class="note">${BUILT.length} built-in films, put together on ${DATA_DATE} from general knowledge, not a live check. Services marked as the film's home (for example Netflix originals) rarely move; licensed films do. Certificates and running times are for guidance; check the BBFC website if it matters.</p></div>
+    <div class="panel"><b>About the built-in list</b><p class="note">${BUILT_FILMS.length} films and ${BUILT_TV.length} TV shows, put together on ${DATA_DATE} from general knowledge, not a live check. Titles marked as the service's own (for example Netflix originals) rarely move; licensed ones do. Season counts for shows still running may be behind. Certificates, age ratings and running times are for guidance; check the BBFC website if it matters.</p></div>
     <button class="btn ghost block" data-act="wipe">Delete all my data</button>`);}
 function b64e(s){const b=new TextEncoder().encode(s); let bin=''; b.forEach(x=>bin+=String.fromCharCode(x)); return btoa(bin);}
 function b64d(s){const bin=atob(s); return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0)));}
-function backupCode(){const copy=JSON.parse(JSON.stringify(state)); delete copy.tog; copy.tm={prov:null,provT:0,page:0,q:'',status:''}; return 'FSB1.'+b64e(JSON.stringify(copy));}
+function backupCode(){const copy=JSON.parse(JSON.stringify(state)); delete copy.tog; delete copy.togs; copy.tm={prov:null,provT:0,page:0,q:'',status:''}; return 'FSB1.'+b64e(JSON.stringify(copy));}
 function backupSheet(){
   openSheet(`<h2>Backup or restore</h2>
     <div class="panel"><b>Make a backup</b><p class="note">Includes your services, watchlist, watched films and ratings, films you added and service changes. Not your TMDB key.</p>
@@ -739,8 +905,9 @@ function setTab(t){state.tab=t; save(); $$('.view').forEach(v=>v.hidden=v.id!=='
   renderView(t); $('#main').scrollTop=0;}
 function renderView(t){({swipe:renderSwipe,watch:renderWatch,seen:renderSeen,browse:renderBrowse})[t]();}
 function renderNav(){const n=state.watch.filter(w=>getFilm(w.id)).length, b=$('#badge-watch'); b.hidden=!n; b.textContent=n;
-  const tn=state.tonight&&getFilm(state.tonight.id), m=myServices();
-  $('#sub-label').textContent=tn?'Tonight: '+tn.t:m.length?`${allFilms().filter(onMine).length} films on ${m.length===1?svcInfo(m[0]).n:m.length+' services'}`:'Choose your services to start';}
+  const tn=state.tonight&&getFilm(state.tonight.id), m=myServices(), cnt=modeFilms().filter(onMine).length;
+  $$('.appbar .seg-mode button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===state.mode)));
+  $('#sub-label').textContent=tn?'Tonight: '+tn.t:m.length?`${cnt} ${noun(state.mode,cnt)} on ${m.length===1?svcInfo(m[0]).n:m.length+' services'}`:'Choose your services to start';}
 function renderAll(){renderNav(); renderView(state.tab); if(sheetCtx&&sheetCtx.redraw) sheetCtx.redraw();}
 
 document.addEventListener('click',e=>{
@@ -779,7 +946,11 @@ document.addEventListener('click',e=>{
       case 'wsort': watchSort=el.dataset.v; renderWatch(); break;
       case 'settonight': setTonight(id); break;
       case 'spin': spinSheet(); break;
-      case 'spinopt': {const k=el.dataset.k; spinOpt[k]=k==='max'?(+el.dataset.v||0):el.dataset.v; spinPick=null; sheetCtx&&sheetCtx.redraw(); break;}
+      case 'spinopt': {const k=el.dataset.k; spinOpt[k]=k==='max'?(+el.dataset.v||0):el.dataset.v; if(k==='kind') spinOpt.max=0; spinPick=null; sheetCtx&&sheetCtx.redraw(); break;}
+      case 'mode': setMode(el.dataset.v); break;
+      case 'wkind': watchKind=el.dataset.v; renderWatch(); break;
+      case 'tvstart': {const w=state.watch.find(x=>x.id===id); if(w){w.s=1; save(); renderAll(); toast('Moved to Watching now');} break;}
+      case 'tvseason': {const w=state.watch.find(x=>x.id===id), f2=getFilm(id); if(w){const n=(w.s||1)+(+el.dataset.d); if(n<1){delete w.s;} else if(f2&&f2.se&&n>f2.se){markWatched(id); break;} else w.s=n; save(); renderAll();} break;}
       case 'spingo': spinGo(); break;
       case 'watchedtn': if(state.tonight) markWatched(state.tonight.id); break;
       case 'markwatched': markWatched(id); break;
@@ -801,16 +972,16 @@ document.addEventListener('click',e=>{
       case 'bkcopy': copyText(backupCode(),'bk-out'); break;
       /* swipe together */
       case 'together': startTogether(); break;
-      case 'togexit': if(state.tog) state.tog.active=false; save(); renderSwipe(); break;
-      case 'togredo': confirmSheet(`Swipe today's ${TOG_N} again?`,'Your swipes and code for today are cleared so you can start over.','Start again',()=>{const T=state.tog; T.dec={}; T.hist=[]; T.matches=null; save(); renderSwipe();}); break;
-      case 'togcopy': if(togOn()&&!togLeft().length) copyText(`My Film Swipe code for today: ${togCode()}`,'tog-mycode'); break;
-      case 'togshare': if(togOn()&&!togLeft().length) navigator.share({title:'Film Swipe',text:`My Film Swipe code for today: ${togCode()}`}).catch(()=>{}); break;
+      case 'togexit': if(TG()) TG().active=false; save(); renderSwipe(); break;
+      case 'togredo': confirmSheet(`Swipe today's ${TOG_N} again?`,'Your swipes and code for today are cleared so you can start over.','Start again',()=>{const T=TG(); T.dec={}; T.hist=[]; T.matches=null; save(); renderSwipe();}); break;
+      case 'togcopy': if(togOn()&&!togLeft().length) copyText(`My Film Swipe ${state.mode==='tv'?'TV':'film'} code for today: ${togCode()}`,'tog-mycode'); break;
+      case 'togshare': if(togOn()&&!togLeft().length) navigator.share({title:'Film Swipe',text:`My Film Swipe ${state.mode==='tv'?'TV':'film'} code for today: ${togCode()}`}).catch(()=>{}); break;
       case 'togfind': {if(!togOn()||togLeft().length) break; const res=readTogCode(($('#tog-code')||{}).value), errEl=$('#tog-err');
         if(res.err){if(errEl) errEl.textContent=res.err; break;}
-        const mine=new Set(togLikes()); state.tog.matches=res.likes.filter(x=>mine.has(x)); state.tog.theirs=res.likes.length; save(); renderSwipe(); break;}
-      case 'togadd': if(state.tog&&state.tog.matches){state.tog.matches.forEach(fid=>{const w=state.watch.find(x=>x.id===fid); if(w) w.both=true; else state.watch.unshift({id:fid,t:Date.now(),both:true}); state.decided[fid]='R';}); state.tog.active=false; save(); setTab('watch'); renderNav(); toast('Matches added to your watchlist');} break;
-      case 'togpick': if(state.tog&&state.tog.matches&&state.tog.matches.length){const ms=state.tog.matches; ms.forEach(fid=>{const w=state.watch.find(x=>x.id===fid); if(w) w.both=true; else state.watch.unshift({id:fid,t:Date.now(),both:true}); state.decided[fid]='R';});
-        const pick=ms[Math.floor(Math.random()*ms.length)]; state.tog.active=false; save(); setTab('watch'); setTonight(pick);} break;
+        const mine=new Set(togLikes()); TG().matches=res.likes.filter(x=>mine.has(x)); TG().theirs=res.likes.length; save(); renderSwipe(); break;}
+      case 'togadd': if(TG()&&TG().matches){TG().matches.forEach(fid=>{const w=state.watch.find(x=>x.id===fid); if(w) w.both=true; else state.watch.unshift({id:fid,t:Date.now(),both:true}); state.decided[fid]='R';}); TG().active=false; save(); setTab('watch'); renderNav(); toast('Matches added to your watchlist');} break;
+      case 'togpick': if(TG()&&TG().matches&&TG().matches.length){const ms=TG().matches; ms.forEach(fid=>{const w=state.watch.find(x=>x.id===fid); if(w) w.both=true; else state.watch.unshift({id:fid,t:Date.now(),both:true}); state.decided[fid]='R';});
+        const pick=ms[Math.floor(Math.random()*ms.length)]; TG().active=false; save(); setTab('watch'); setTonight(pick);} break;
       case 'wipe': confirmSheet('Delete all your data?','Your watchlist, ratings, films you added and settings are removed from this phone. This cannot be undone. Copy a backup code first if you want to keep them.','Delete everything',()=>{try{localStorage.removeItem(KEY); localStorage.removeItem(TKEY);}catch(e){} state=defaults(); reindex(); setTab('swipe'); renderNav(); servicesSheet(true);},true); break;
     }
     if(el.dataset.close&&a!=='close') closeSheet();
@@ -829,7 +1000,9 @@ document.addEventListener('keydown',e=>{
 /* Boot */
 if(!['swipe','watch','seen','browse'].includes(state.tab)) state.tab='swipe';
 ['watch','own','found','history','front'].forEach(k=>{if(!Array.isArray(state[k])) state[k]=[];});
-['decided','watched','svcOverride','live','tmIds'].forEach(k=>{if(!state[k]||typeof state[k]!=='object'||Array.isArray(state[k])) state[k]={};});
+['decided','watched','svcOverride','live','tmIds','togs'].forEach(k=>{if(!state[k]||typeof state[k]!=='object'||Array.isArray(state[k])) state[k]={};});
+if(state.tog){ if(!state.togs.film) state.togs.film=state.tog; delete state.tog; }
+if(!['film','tv'].includes(state.mode)) state.mode='film';
 renderNav(); setTab(state.tab);
 if(!state.setup) servicesSheet(true);
 })();
