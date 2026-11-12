@@ -333,7 +333,7 @@ const BUILT=BUILT_FILMS.concat(BUILT_TV);
    ------------------------------------------------------------------ */
 const KEY='filmSwipe.v1', TKEY='filmSwipe.tmdbKey';
 function emptyFilters(){return {genres:[],moods:[],maxMins:0,maxCert:'',decades:[],svc:[],maxSeasons:0,ended:false};}
-function defaults(){return {v:1,setup:false,mode:'film',togs:{},settings:{services:[],custom:[],onlyMine:true,posters:false},filters:emptyFilters(),
+function defaults(){return {v:1,setup:false,mode:'film',togs:{},moved:{},settings:{services:[],custom:[],onlyMine:true,posters:false,taste:true,names:['',''],dinnerUrl:''},filters:emptyFilters(),
   seed:Math.floor(Math.random()*1e9),decided:{},history:[],front:[],watch:[],watched:{},tonight:null,own:[],svcOverride:{},
   live:{},found:[],tmIds:{},tm:{prov:null,provT:0,page:0,q:'',status:''},tog:null,tab:'swipe'};}
 let state=defaults();
@@ -362,7 +362,9 @@ const ICON={
   eye:'<svg class="i" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   dice:'<svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="9" cy="15" r="1"/></svg>',
   play:'<svg class="i" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg>',
-  ext:'<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>'
+  ext:'<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+  star:'<svg class="i" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>',
+  fork:'<svg class="i" viewBox="0 0 24 24"><path d="M7 3v8a2 2 0 0 0 2 2v8M11 3v8a2 2 0 0 1-2 2M9 3v6M16 21V3c2 1 3 4 3 7s-1 4-3 4"/></svg>'
 };
 
 /* Services */
@@ -421,11 +423,20 @@ function matchesFilters(f,flt){flt=flt||state.filters;
   return true;}
 function modeFilms(){return allFilms().filter(f=>kindOf(f)===state.mode);}
 function serviceGate(f){return !(state.settings.onlyMine&&myServices().length)||onMine(f);}
+/* Taste: genres and moods of films you rated 4–5 stars move up the deck, 1–2 stars move down.
+   Needs at least 3 ratings. Each rating adds (stars − 3) to every genre and mood of that title. */
+let tasteCache=null;
+function taste(){if(tasteCache) return tasteCache; const t={}, rated=Object.entries(state.watched).filter(([id,w])=>w.r&&getFilm(id));
+  if(rated.length<3||state.settings.taste===false) return tasteCache={on:false,t};
+  rated.forEach(([id,w])=>{const f=getFilm(id), d=w.r-3; [...(f.g||[]),...(f.mo||[])].forEach(k=>t[k]=(t[k]||0)+d);}); return tasteCache={on:true,t,n:rated.length};}
+function affinity(f){const T=taste(); if(!T.on) return 0; const keys=[...(f.g||[]),...(f.mo||[])]; if(!keys.length) return 0;
+  return clamp(keys.reduce((a,k)=>a+(T.t[k]||0),0)/keys.length,-3,3);}
 function deck(){
   const front=state.front||[];
   const list=modeFilms().filter(f=>!state.decided[f.id]&&!state.watched[f.id]&&!inWatch(f.id)&&serviceGate(f)&&matchesFilters(f));
-  const key=f=>{const i=front.indexOf(f.id); return i>=0?-1e13+i:hash(state.seed+':'+f.id);};
-  return list.sort((a,b)=>key(a)-key(b));}
+  const key=f=>{const i=front.indexOf(f.id); return i>=0?-1e13+i:hash(state.seed+':'+f.id)/4294967296-0.14*affinity(f);};
+  const keys=new Map(list.map(f=>[f.id,key(f)]));
+  return list.sort((a,b)=>keys.get(a.id)-keys.get(b.id));}
 function filterCount(){const f=state.filters; return f.genres.length+f.moods.length+f.decades.length+f.svc.length+(f.maxMins?1:0)+(f.maxCert?1:0)+(state.mode==='tv'?(f.maxSeasons?1:0)+(f.ended?1:0):0);}
 function setMode(m){if(m===state.mode) return; state.mode=m; state.filters.maxMins=0; save(); renderAll(); toast(m==='tv'?'Showing TV shows':'Showing films');}
 
@@ -436,8 +447,8 @@ function cardHtml(f,i,top){
   const both=TG()&&TG().matches&&TG().matches.includes(f.id);
   return `<article class="card${top?' top':''}" data-id="${esc(f.id)}" style="transform:translateY(${i*8}px) scale(${1-i*0.03});z-index:${10-i}" ${top?'tabindex="0" aria-label="'+esc(f.t)+'. Swipe right to add to watchlist, left to skip, or press Enter for details."':'aria-hidden="true"'}>
     ${artHtml(f)}
-    <span class="stamp pick">WATCH</span><span class="stamp nope">NOPE</span><span class="stamp seen">SEEN IT</span>
-    ${both?'<span class="both-tag">You both liked</span>':''}
+    <span class="stamp pick">WATCH</span><span class="stamp nope">NOPE</span><span class="stamp seen">SEEN IT</span><span class="stamp love">MUST WATCH</span>
+    ${both?'<span class="both-tag">You both liked</span>':''}${!togOn()&&affinity(f)>=1?'<span class="taste-tag">Your kind of thing</span>':''}
     <div class="card-body">
       <div class="eyebrow num">${esc(factsText(f))}${f.g&&f.g.length?' · '+esc(genreText(f)):''}</div>
       <h2>${esc(f.t)}</h2>
@@ -445,19 +456,22 @@ function cardHtml(f,i,top){
       <div class="svcs">${svcTags(f,{short:true})}</div>
     </div>
   </article>`;}
-function tonightHtml(){const tn=state.tonight; if(!tn) return ''; const f=getFilm(tn.id); if(!f){state.tonight=null; return '';}
+function tonightHtml(compact){const tn=state.tonight; if(!tn) return ''; const f=getFilm(tn.id); if(!f){state.tonight=null; return '';}
   const mine=mineOf(f), s=svcInfo(mine[0]||svcOf(f)[0]||'');
+  if(compact) return `<div class="tonight compact">${artHtml(f,'mini')}<div style="min-width:0"><div class="lbl">Tonight</div><button class="tonight-name" data-act="open" data-id="${esc(f.id)}">${esc(f.t)}</button></div>
+    ${svcOf(f).length?`<a class="btn sm primary" href="${esc(s.url(f.t))}" target="_blank" rel="noopener noreferrer">${ICON.play} ${esc(s.n)}</a>`:`<button class="btn sm" data-tab="watch">Details</button>`}</div>`;
   return `<div class="tonight">${artHtml(f,'mini')}<div style="min-width:0"><div class="lbl">Tonight's film</div><button class="tonight-name" data-act="open" data-id="${esc(f.id)}">${esc(f.t)}</button>
     <div class="small muted num">${esc(factsText(f))}${svcOf(f).length?' · '+esc(s.n):''}</div>
-    <div class="row">${svcOf(f).length?`<a class="btn sm primary" href="${esc(s.url(f.t))}" target="_blank" rel="noopener noreferrer">${ICON.play} Open ${esc(s.n)}</a>`:''}<button class="btn sm" data-act="watchedtn">We watched it</button><button class="btn sm ghost" data-act="spin">Change</button></div></div></div>`;}
+    <div class="row">${svcOf(f).length?`<a class="btn sm primary" href="${esc(s.url(f.t))}" target="_blank" rel="noopener noreferrer">${ICON.play} Open ${esc(s.n)}</a>`:''}<button class="btn sm" data-act="watchedtn">We watched it</button><button class="btn sm" data-act="pair" data-id="${esc(f.id)}">${ICON.fork} Dinner</button><button class="btn sm ghost" data-act="spin">Change</button></div></div></div>`;}
 function renderSwipe(){
   const v=$('#view-swipe');
   if(togOn()){ensureTog(); const left=togLeft().map(getFilm).filter(Boolean);
     v.innerHTML=togHeader()+(left.length?`<div class="deck" id="deck">${left.slice(0,3).map((f,i)=>cardHtml(f,i,i===0)).reverse().join('')}</div>
     <div class="actions"><button class="act sm" data-act="undo" aria-label="Undo last swipe">${ICON.undo}</button>
       <button class="act lg skip" data-act="skip" aria-label="Not for me">${ICON.x}</button>
+      <button class="act sm love" data-act="love" aria-label="Must watch (super-like)">${ICON.star}</button>
       <button class="act lg pick" data-act="pick" aria-label="I'd watch this">${ICON.heart}</button>
-      <button class="act sm" data-act="info" aria-label="Film details">${ICON.info}</button></div>`:togDoneHtml());
+      <button class="act sm" data-act="info" aria-label="Details">${ICON.info}</button></div>`:togDoneHtml());
     const tt=$('#deck .card.top'); if(tt) bindDrag(tt); return;}
   const d=deck(), fc=filterCount(), mine=myServices(), f=state.filters;
   const svcChips=mine.length?mine.map(k=>{const s=svcInfo(k); return `<button class="chip" data-act="fsvc" data-v="${esc(k)}" aria-pressed="${f.svc.includes(k)}"><span class="sw" style="background:${s.c}"></span>${esc(s.n)}</button>`;}).join(''):'';
@@ -472,9 +486,10 @@ function renderSwipe(){
     <div class="actions"><button class="act sm" data-act="undo" aria-label="Undo last swipe">${ICON.undo}</button>
       <button class="act lg skip" data-act="skip" aria-label="Skip this film">${ICON.x}</button>
       <button class="act sm seen" data-act="seen" aria-label="Seen it already">${ICON.eye}</button>
+      <button class="act sm love" data-act="love" aria-label="Must watch (super-like)">${ICON.star}</button>
       <button class="act lg pick" data-act="pick" aria-label="Add to watchlist">${ICON.heart}</button>
       <button class="act sm" data-act="info" aria-label="Film details">${ICON.info}</button></div>`;
-  v.innerHTML=`${tonightHtml()}<div class="strip"><div><b class="num">${d.length} ${noun(state.mode,d.length)} to swipe</b><div class="small muted">${mine.length?(state.settings.onlyMine?'On your services':'All services, yours marked ✓'):'<button class="x-btn" data-act="services" style="padding:0">Choose your services</button>'}</div></div>
+  v.innerHTML=`${tonightHtml(true)}<div class="strip"><div><b class="num">${d.length} ${noun(state.mode,d.length)} to swipe</b><div class="small muted">${mine.length?(state.settings.onlyMine?'On your services':'All services, yours marked ✓'):'<button class="x-btn" data-act="services" style="padding:0">Choose your services</button>'}</div></div>
     <div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="together">Swipe together</button></div></div>
     <div class="chips" role="group" aria-label="Filter films">${chips}</div>${body}`;
   const top=$('#deck .card.top'); if(top) bindDrag(top);}
@@ -482,14 +497,15 @@ function bindDrag(card){
   let sx=0,sy=0,dx=0,dy=0,active=false,moved=false;
   card.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;active=true;moved=false;sx=e.clientX;sy=e.clientY;dx=dy=0;try{card.setPointerCapture(e.pointerId);}catch(_){}card.classList.add('dragging');});
   card.addEventListener('pointermove',e=>{if(!active)return;dx=e.clientX-sx;dy=e.clientY-sy;if(Math.abs(dx)>6||Math.abs(dy)>6)moved=true;
-    const down=!togOn()&&dy>0&&dy>Math.abs(dx);
-    card.style.transform=`translate(${dx}px,${down?dy:dy*0.25}px) rotate(${dx/18}deg)`;
-    const p=Math.min(1,Math.abs(dx)/100), pd=down?Math.min(1,dy/110):0;
-    card.style.setProperty('--pick-o',dx>0&&!down?p:0);card.style.setProperty('--nope-o',dx<0&&!down?p:0);card.style.setProperty('--seen-o',pd);});
+    const vert=Math.abs(dy)>Math.abs(dx), down=!togOn()&&dy>0&&vert, up=dy<0&&vert;
+    card.style.transform=`translate(${dx}px,${down||up?dy:dy*0.25}px) rotate(${dx/18}deg)`;
+    const p=Math.min(1,Math.abs(dx)/100), pd=down?Math.min(1,dy/110):0, pu=up?Math.min(1,-dy/110):0;
+    card.style.setProperty('--pick-o',dx>0&&!vert?p:0);card.style.setProperty('--nope-o',dx<0&&!vert?p:0);card.style.setProperty('--seen-o',pd);card.style.setProperty('--love-o',pu);});
   const end=e=>{if(!active)return;active=false;card.classList.remove('dragging');
     if(!togOn()&&dy>110&&dy>Math.abs(dx)) return decide('S');
+    if(dy<-110&&-dy>Math.abs(dx)) return decide('U');
     if(dx>100) return decide('R'); if(dx<-100) return decide('L');
-    card.style.transform='';['--pick-o','--nope-o','--seen-o'].forEach(k=>card.style.setProperty(k,0));
+    card.style.transform='';['--pick-o','--nope-o','--seen-o','--love-o'].forEach(k=>card.style.setProperty(k,0));
     if(!moved&&e.type==='pointerup') openFilm(card.dataset.id,'deck');};
   card.addEventListener('pointerup',end);card.addEventListener('pointercancel',end);
   card.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){e.preventDefault();decide('R');}else if(e.key==='ArrowLeft'){e.preventDefault();decide('L');}else if(e.key==='ArrowDown'&&!togOn()){e.preventDefault();decide('S');}else if(e.key==='Enter'||e.key===' '){e.preventDefault();openFilm(card.dataset.id,'deck');}});
@@ -498,14 +514,15 @@ let busy=false;
 function decide(dir){
   const card=$('#deck .card.top'); if(!card||busy) return; busy=true; const id=card.dataset.id;
   card.classList.remove('dragging');
-  card.style.setProperty(dir==='R'?'--pick-o':dir==='L'?'--nope-o':'--seen-o',1);
-  card.style.transform=dir==='S'?'translate(0,120%)':`translate(${dir==='R'?140:-140}%, -30px) rotate(${dir==='R'?20:-20}deg)`;
+  card.style.setProperty(dir==='R'?'--pick-o':dir==='L'?'--nope-o':dir==='U'?'--love-o':'--seen-o',1);
+  card.style.transform=dir==='S'?'translate(0,120%)':dir==='U'?'translate(0,-120%)':`translate(${dir==='R'?140:-140}%, -30px) rotate(${dir==='R'?20:-20}deg)`;
   card.classList.add('leaving');
   setTimeout(()=>{busy=false;applyDecision(id,dir);},reduced()?0:240);}
 function applyDecision(id,dir){
   if(togOn()){const T=TG(); T.dec[id]=dir; T.hist.push(id); T.matches=null; save(); renderSwipe(); if(!togLeft().length) toast(`All ${TOG_N} done. Swap codes!`); return;}
   state.decided[id]=dir; state.history.push(id); state.front=state.front.filter(x=>x!==id);
-  if(dir==='R'&&!inWatch(id)) state.watch.unshift({id,t:Date.now()});
+  if((dir==='R'||dir==='U')&&!inWatch(id)) state.watch.unshift(dir==='U'?{id,t:Date.now(),love:true}:{id,t:Date.now()});
+  if(dir==='U') toast('Added as a must watch ★');
   if(dir==='S'&&!state.watched[id]) state.watched[id]={t:Date.now(),r:0,swipe:true};
   save(); renderSwipe(); renderNav();
   if(dir==='S') toast('Marked as seen. Rate it on the Watched tab');}
@@ -513,7 +530,7 @@ function undo(){
   if(togOn()){const T=TG(), tid=T.hist.pop(); if(!tid){toast('Nothing to undo');return;} delete T.dec[tid]; T.matches=null; save(); renderSwipe(); toast('Brought it back'); return;}
   const id=state.history.pop(); if(!id){toast('Nothing to undo');return;}
   const d=state.decided[id];
-  if(d==='R') state.watch=state.watch.filter(w=>w.id!==id);
+  if(d==='R'||d==='U') state.watch=state.watch.filter(w=>w.id!==id);
   if(d==='S'&&state.watched[id]&&state.watched[id].swipe) delete state.watched[id];
   delete state.decided[id]; state.front.unshift(id); save(); renderSwipe(); renderNav(); toast('Brought it back');}
 
@@ -528,6 +545,8 @@ function filmRow(f,extra){
     <div class="film-side">${extra&&extra.side||''}</div>
     ${extra&&extra.actions?`<div class="film-actions">${extra.actions}</div>`:''}</div>`;}
 let watchKind='all';
+function movedIds(){return Object.keys(state.moved||{}).filter(id=>inWatch(id)&&getFilm(id)&&!onMine(getFilm(id)));}
+function movedPill(f){if(!(state.moved||{})[f.id]||onMine(f)) return ''; const s=svcOf(f); return `<span class="pill warn">${s.length?'Moved to '+esc(svcInfo(s[0]).n):'No longer streaming'}</span>`;}
 function tvActions(f,w){
   if(kindOf(f)!=='tv') return '';
   return w.s?`<div class="stepper" role="group" aria-label="Season you're on"><button data-act="tvseason" data-id="${esc(f.id)}" data-d="-1" aria-label="Previous season">−</button><span class="num">Season ${w.s}${f.se?' of '+f.se:''}</span><button data-act="tvseason" data-id="${esc(f.id)}" data-d="1" aria-label="Next season">+</button></div>`
@@ -537,37 +556,52 @@ function renderWatch(){
   let list=all.filter(x=>watchKind==='all'||kindOf(x.f)===watchKind);
   if(!all.length){v.innerHTML=`${tonightHtml()}<div class="empty" style="min-height:58vh"><h2>Your watchlist is empty</h2><p>Swipe right on films and shows you'd like to watch. They'll wait here until you're ready.</p>
     <div class="row" style="width:100%;max-width:360px"><button class="btn primary" data-tab="swipe">Start swiping</button><button class="btn" data-act="together">Swipe together</button></div></div>`; return;}
+  if(watchSort==='added') list.sort((a,b)=>(b.w.love?1:0)-(a.w.love?1:0));
   if(watchSort==='short') list.sort((a,b)=>(a.f.m||999)-(b.f.m||999));
   else if(watchSort==='service') list.sort((a,b)=>{const ka=(mineOf(a.f)[0]||'~'+(svcOf(a.f)[0]||'~')), kb=(mineOf(b.f)[0]||'~'+(svcOf(b.f)[0]||'~')); return ka<kb?-1:ka>kb?1:0;});
   const onMy=list.filter(x=>onMine(x.f)).length, nf=all.filter(x=>kindOf(x.f)==='film').length, nt=all.length-nf;
   const watching=list.filter(x=>x.w.s), rest=list.filter(x=>!x.w.s);
-  const row=({w,f})=>filmRow(f,{side:w.both?'<span class="pill">You both liked</span>':w.s?'<span class="pill gold">Watching</span>':'',
+  const mvd=movedIds();
+  const row=({w,f})=>filmRow(f,{side:movedPill(f)||(w.love?'<span class="pill gold">★ Must watch</span>':'')+(w.both?'<span class="pill">You both liked</span>':w.s?'<span class="pill gold">Watching</span>':''),
       actions:`${tvActions(f,w)}<button class="btn sm" data-act="settonight" data-id="${esc(f.id)}">Tonight</button><button class="toggle" data-act="markwatched" data-id="${esc(f.id)}">${kindOf(f)==='tv'?'Finished it':'Watched it'}</button><button class="x-btn" data-act="unwatch" data-id="${esc(f.id)}">Remove</button>`});
   v.innerHTML=`${tonightHtml()}
-    <button class="btn primary block" data-act="spin">${ICON.dice} What shall we watch tonight?</button>
+    ${mvd.length?`<div class="notice" role="status"><span>${mvd.length} on your watchlist ${mvd.length===1?'is':'are'} no longer on your services.</span><button class="btn sm" data-act="movedok">OK</button></div>`:''}
+    <div class="row"><button class="btn primary" data-act="spin">${ICON.dice} Pick for tonight</button><button class="btn" data-act="veto" data-v="watch">Veto night</button></div>
     <div class="chips" role="group" aria-label="Show">${[['all',`All · ${all.length}`],['film',`Films · ${nf}`],['tv',`TV · ${nt}`]].map(([k,l])=>`<button class="chip" data-act="wkind" data-v="${k}" aria-pressed="${watchKind===k}">${l}</button>`).join('')}</div>
     <div class="kv"><span class="small muted num">${myServices().length?`${onMy} of ${list.length} on your services`:''}</span>
       <div class="chips" role="group" aria-label="Sort" style="margin:0;padding:0">${[['added','Newest'],['short','Shortest'],['service','By service']].map(([k,l])=>`<button class="chip" data-act="wsort" data-v="${k}" aria-pressed="${watchSort===k}">${l}</button>`).join('')}</div></div>
     ${watching.length?`<div class="section-title">Watching now</div>${watching.map(row).join('')}<div class="section-title">Up next</div>`:''}
     ${rest.length?rest.map(row).join(''):list.length?'':`<p class="muted">No ${watchKind==='tv'?'shows':'films'} on your watchlist yet.</p>`}`;}
 function setTonight(id){state.tonight={id,t:Date.now()}; save(); renderAll(); const f=getFilm(id); toast(`Tonight: ${f?f.t:'film'}`);}
-let spinOpt={from:'watch',max:0,mood:'',mine:true,kind:'any'}, spinLast=null, spinPick=null;
+let spinOpt={from:'watch',max:0,mood:'',mine:true,kind:'any',by:''}, spinLast=null, spinPick=null;
+/* Minutes from now until the "finish by" time (tomorrow if that time has already passed today) */
+function minsUntil(hhmm){const [h,m]=String(hhmm).split(':').map(Number); if(!(h>=0)) return 0; const now=new Date(), t=new Date(now); t.setHours(h,m||0,0,0); if(t<=now) t.setDate(t.getDate()+1); return Math.floor((t-now)/60000);}
+function spinFits(f){if(!spinOpt.by) return true; const avail=minsUntil(spinOpt.by); return !!f.m&&f.m<=avail;}
+function fitText(f){if(!spinOpt.by||!f.m) return ''; const avail=minsUntil(spinOpt.by);
+  if(kindOf(f)==='tv'){const n=Math.floor(avail/f.m); return `About ${n} episode${n===1?'':'s'} fit before ${spinOpt.by}.`;}
+  const end=new Date(Date.now()+f.m*60000); return `Start now and it finishes about ${String(end.getHours()).padStart(2,'0')}:${String(end.getMinutes()).padStart(2,'0')}.`;}
 function spinPool(){
   const base=spinOpt.from==='watch'?state.watch.map(w=>getFilm(w.id)).filter(Boolean):allFilms().filter(f=>!state.watched[f.id]&&state.decided[f.id]!=='L');
-  return base.filter(f=>(spinOpt.kind==='any'||kindOf(f)===spinOpt.kind)&&(!spinOpt.max||!f.m||f.m<=spinOpt.max)&&(!spinOpt.mood||(f.mo||[]).includes(spinOpt.mood))&&(!spinOpt.mine||!myServices().length||onMine(f)));}
+  return base.filter(f=>(spinOpt.kind==='any'||kindOf(f)===spinOpt.kind)&&spinFits(f)&&(!spinOpt.max||!f.m||f.m<=spinOpt.max)&&(!spinOpt.mood||(f.mo||[]).includes(spinOpt.mood))&&(!spinOpt.mine||!myServices().length||onMine(f)));}
 function spinSheet(){spinPick=null; const draw=()=>{const pool=spinPool(), f=spinPick&&getFilm(spinPick);
   return `<h2>What shall we watch tonight?</h2>
     <div class="chips wrap" role="group" aria-label="Choose from">${[['watch','From our watchlist'],['all','Anything we haven\u2019t seen']].map(([k,l])=>`<button class="chip" data-act="spinopt" data-k="from" data-v="${k}" aria-pressed="${spinOpt.from===k}">${l}</button>`).join('')}</div>
     <div class="chips wrap" role="group" aria-label="Film or TV">${[['any','Film or TV'],['film','A film'],['tv','A TV show']].map(([k,l])=>`<button class="chip" data-act="spinopt" data-k="kind" data-v="${k}" aria-pressed="${spinOpt.kind===k}">${l}</button>`).join('')}</div>
     <div class="chips wrap" role="group" aria-label="Length">${(spinOpt.kind==='tv'?TV_LENGTHS:LENGTHS).map(([k,l])=>`<button class="chip" data-act="spinopt" data-k="max" data-v="${k}" aria-pressed="${spinOpt.max===k}">${l}</button>`).join('')}</div>
     <div class="chips wrap" role="group" aria-label="Mood"><button class="chip" data-act="spinopt" data-k="mood" data-v="" aria-pressed="${!spinOpt.mood}">Any mood</button>${Object.keys(MOODS).map(k=>`<button class="chip" data-act="spinopt" data-k="mood" data-v="${k}" aria-pressed="${spinOpt.mood===k}">${esc(MOODS[k])}</button>`).join('')}</div>
-    ${myServices().length?`<label class="chk"><input type="checkbox" id="spin-mine" ${spinOpt.mine?'checked':''}> Only films on our services</label>`:''}
-    ${f?`<div class="reveal panel" style="gap:12px">${artHtml(f,'hero')}<h3 style="font-size:22px">${esc(f.t)}</h3><span class="small muted num">${esc(factsText(f))} · ${esc(genreText(f))}</span>${f.b?`<p class="muted">${esc(f.b)}</p>`:''}<div class="svcs">${svcTags(f)}</div>
+    <div class="row" style="align-items:center;flex-wrap:nowrap"><label class="chk" style="flex:1;align-items:center"><input type="checkbox" id="spin-byon" ${spinOpt.by?'checked':''}> We need to finish by</label>
+      <input class="inp" type="time" id="spin-by" value="${esc(spinOpt.by||'22:30')}" style="width:auto" aria-label="Finish by"></div>
+    ${spinOpt.by?`<p class="note num">That gives you ${hrs(minsUntil(spinOpt.by))} from now.</p>`:''}
+    ${myServices().length?`<label class="chk"><input type="checkbox" id="spin-mine" ${spinOpt.mine?'checked':''}> Only titles on our services</label>`:''}
+    ${f?`<div class="reveal panel" style="gap:12px">${artHtml(f,'hero')}<h3 style="font-size:22px">${esc(f.t)}</h3><span class="small muted num">${esc(factsText(f))} · ${esc(genreText(f))}</span>${f.b?`<p class="muted">${esc(f.b)}</p>`:''}${fitText(f)?`<p class="small"><b>${esc(fitText(f))}</b></p>`:''}<div class="svcs">${svcTags(f)}</div>
       <div class="row"><button class="btn primary" data-act="settonight" data-id="${esc(f.id)}" data-close="1">Watch this tonight</button><button class="btn" data-act="spingo">${ICON.dice} Spin again</button></div></div>`
       :`<button class="btn primary block" data-act="spingo" ${pool.length?'':'disabled'}>${ICON.dice} Pick for us${pool.length?` (from ${plural(pool.length,'film')})`:''}</button>
       ${pool.length?'':`<p class="small muted">Nothing matches. ${spinOpt.from==='watch'?'Try \u201cAnything we haven\u2019t seen\u201d, or swipe right on a few more films.':'Loosen the length or mood.'}</p>`}`}`;};
   openSheet(draw(),{ctx:{redraw:()=>sheetRedraw(draw,bindSpinMine)},onMount:bindSpinMine});}
-function bindSpinMine(b){const c=$('#spin-mine',b); if(c) c.onchange=()=>{spinOpt.mine=c.checked; spinPick=null; if(sheetCtx&&sheetCtx.redraw) sheetCtx.redraw();};}
+function bindSpinMine(b){const c=$('#spin-mine',b), on=$('#spin-byon',b), by=$('#spin-by',b), redo=()=>{spinPick=null; if(sheetCtx&&sheetCtx.redraw) sheetCtx.redraw();};
+  if(c) c.onchange=()=>{spinOpt.mine=c.checked; redo();};
+  if(on) on.onchange=()=>{spinOpt.by=on.checked?(by.value||'22:30'):''; redo();};
+  if(by) by.onchange=()=>{if(by.value){spinOpt.by=by.value; redo();}};}
 function spinGo(){const pool=spinPool(); if(!pool.length){toast('Nothing matches');return;} let opts=pool.filter(f=>f.id!==spinLast); if(!opts.length) opts=pool;
   spinPick=opts[Math.floor(Math.random()*opts.length)].id; spinLast=spinPick; sheetCtx&&sheetCtx.redraw();}
 
@@ -602,7 +636,7 @@ function renderBrowse(){
   const nm=modeFilms().length;
   v.innerHTML=`<input class="search" id="browse-q" type="search" placeholder="Search ${nm} ${noun(state.mode,nm)}, ${state.mode==='tv'?'creators':'directors'}, genres" value="${esc(browseQ)}" aria-label="Search">
     <div class="chips" role="group" aria-label="Show">${modes.map(([k,l])=>`<button class="chip" data-act="bmode" data-v="${k}" aria-pressed="${browseMode===k}">${l}</button>`).join('')}</div>
-    <div class="row"><button class="btn sm" data-act="addfilm">Add a film</button><button class="btn sm" data-act="tmdb">${tmdbKey()?'Find more on TMDB':'Live updates (TMDB)'}</button></div>
+    <div class="row"><button class="btn sm primary" data-act="tmsearch">Search TMDB</button><button class="btn sm" data-act="addfilm">Add your own</button>${tmdbKey()?'<button class="btn sm" data-act="findmore">Find more</button>':''}</div>
     <div id="browse-list" style="display:flex;flex-direction:column;gap:10px">${browseListHtml()}</div>`;
   const inp=$('#browse-q'); inp.oninput=()=>{browseQ=inp.value; $('#browse-list').innerHTML=browseListHtml();};}
 function sourceNote(f){const src=svcSource(f), l=state.live[f.id];
@@ -611,7 +645,7 @@ function sourceNote(f){const src=svcSource(f), l=state.live[f.id];
   return f.st?`From the built-in list (${DATA_DATE}). ${esc(svcInfo(f.s[0]).n)} made or owns this film, so it normally stays there.`:`From the built-in list (${DATA_DATE}). Licensed films move between services, so check before you sit down.`;}
 function openFilm(id,from){const f=getFilm(id); if(!f) return;
   const draw=()=>{const l=state.live[f.id], list=svcOf(f), w=state.watched[f.id], extras=l&&l.names?l.names.filter(n=>!allServices().some(s=>s.re.test(n))):[];
-    const deckBtns=from==='deck'?`<div class="row sticky-actions"><button class="btn" data-act="dskip">${ICON.x} Skip</button><button class="btn" data-act="dseen">${ICON.eye} Seen it</button><button class="btn primary" data-act="dpick">${ICON.heart} Watchlist</button></div>`:'';
+    const deckBtns=from==='deck'?`<div class="row sticky-actions"><button class="btn" data-act="dskip">${ICON.x} Skip</button>${togOn()?'':`<button class="btn" data-act="dseen">${ICON.eye} Seen it</button>`}<button class="btn" data-act="dlove">${ICON.star} Must watch</button><button class="btn primary" data-act="dpick">${ICON.heart} ${togOn()?'Like':'Watchlist'}</button></div>`:'';
     return `${artHtml(f,'hero')}
     <h2>${esc(f.t)}</h2>
     <div class="small muted num">${esc(factsText(f))}${f.d?' · '+(kindOf(f)==='tv'?'Created by ':'')+esc(f.d):''}</div>
@@ -624,7 +658,7 @@ function openFilm(id,from){const f=getFilm(id); if(!f) return;
       <div class="linkrow">${list.map(k=>{const s=svcInfo(k); return `<a class="btn sm${myServices().includes(k)?' primary':''}" href="${esc(s.url(f.t))}" target="_blank" rel="noopener noreferrer">${ICON.play} ${esc(s.n)}</a>`;}).join('')}
         <a class="btn sm" href="${esc(l&&l.link?l.link:'https://www.justwatch.com/uk/search?q='+enc(f.t))}" target="_blank" rel="noopener noreferrer">${ICON.ext} Check where to watch</a>
         <a class="btn sm" href="https://www.youtube.com/results?search_query=${enc(f.t+' '+(f.y||'')+' trailer')}" target="_blank" rel="noopener noreferrer">${ICON.ext} Trailer</a></div>
-      <div class="row"><button class="btn sm ghost" data-act="editsvc" data-id="${esc(f.id)}">Change services</button>${tmdbKey()?`<button class="btn sm ghost" data-act="refreshone" data-id="${esc(f.id)}">Check live now</button>`:''}</div></div>
+      <div class="row"><button class="btn sm" data-act="pair" data-id="${esc(f.id)}">${ICON.fork} Dinner with this</button><button class="btn sm ghost" data-act="editsvc" data-id="${esc(f.id)}">Change services</button>${tmdbKey()?`<button class="btn sm ghost" data-act="refreshone" data-id="${esc(f.id)}">Check live now</button>`:''}</div></div>
     ${w?`<div class="panel"><b>You watched this</b>${starsHtml(f.id)}</div>`:''}
     ${from!=='deck'?`<div class="row">${inWatch(f.id)?`<button class="btn" data-act="unwatch" data-id="${esc(f.id)}">Remove from watchlist</button>`:`<button class="btn" data-act="addwatch" data-id="${esc(f.id)}">${ICON.heart} Add to watchlist</button>`}
       <button class="btn" data-act="settonight" data-id="${esc(f.id)}" data-close="1">Watch tonight</button>${w?'':`<button class="btn" data-act="markwatched" data-id="${esc(f.id)}">${kindOf(f)==='tv'?'Finished it':'Watched it'}</button>`}</div>`:''}
@@ -685,20 +719,26 @@ function togOn(){return !!(TG()&&TG().active);}
 function ensureTog(){const day=dayKey(), mask=svcMask(), key=day+'-'+mask.toString(36), cur=TG();
   if(!cur||cur.key!==key) state.togs[state.mode]={active:!!(cur&&cur.active),key,day,mask,ids:togSet(day,mask,state.mode),dec:{},hist:[],matches:null,theirs:0};}
 function togLeft(){return TG().ids.filter(id=>!TG().dec[id]);}
-function togLikes(){return TG().ids.filter(id=>TG().dec[id]==='R');}
+function togLikes(){return TG().ids.filter(id=>TG().dec[id]==='R'||TG().dec[id]==='U');}
+function togLoves(){return TG().ids.filter(id=>TG().dec[id]==='U');}
+/* Rank shared likes: 3 = you both loved it, 2 = one of you loved it, 1 = you both liked it */
+function rankMatches(theirLikes,theirLoves){const mine=new Set(togLikes()), myLoves=new Set(togLoves()), tl=new Set(theirLoves);
+  return theirLikes.filter(id=>mine.has(id)).map(id=>({id,score:1+(myLoves.has(id)?1:0)+(tl.has(id)?1:0)})).sort((a,b)=>b.score-a.score);}
+const TIER_LABEL={3:'You both loved',2:'One of you loved',1:'You both liked'};
 function togCheck(ids){return hash(ids.join(',')).toString(36).slice(0,4);}
-function togCode(){const T=TG(); let bits=0; T.ids.forEach((id,i)=>{if(T.dec[id]==='R') bits+=2**i;}); return `${TOG_PREFIX[state.mode]}-${T.day}-${T.mask.toString(36)}-${togCheck(T.ids)}-${bits.toString(36)}`;}
+function togCode(){const T=TG(); let bits=0, love=0; T.ids.forEach((id,i)=>{if(T.dec[id]==='R'||T.dec[id]==='U') bits+=2**i; if(T.dec[id]==='U') love+=2**i;});
+  return `${TOG_PREFIX[state.mode]}-${T.day}-${T.mask.toString(36)}-${togCheck(T.ids)}-${bits.toString(36)}${love?'-'+love.toString(36):''}`;}
 function readTogCode(txt){
   const nn=noun(state.mode,2), pre=TOG_PREFIX[state.mode];
-  const m=String(txt||'').match(/(FS1|TV1)-(\d{8})-([a-z0-9]+)-([a-z0-9]{1,4})-([a-z0-9]+)/i); if(!m) return {err:`That doesn\u2019t look like a Swipe together code. Paste the whole thing, starting ${pre}-.`};
+  const m=String(txt||'').match(/(FS1|TV1)-(\d{8})-([a-z0-9]+)-([a-z0-9]{1,4})-([a-z0-9]+)(?:-([a-z0-9]+))?/i); if(!m) return {err:`That doesn\u2019t look like a Swipe together code. Paste the whole thing, starting ${pre}-.`};
   if(m[1].toUpperCase()!==pre) return {err:m[1].toUpperCase()==='TV1'?'That code is for TV shows. Tap TV at the top, swipe today\u2019s 28 shows, then paste it again.':'That code is for films. Tap Films at the top, swipe today\u2019s 28 films, then paste it again.'};
   const T=TG();
   if(m[2]!==T.day){const d=m[2]; return {err:`That code is for ${+d.slice(6)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+d.slice(4,6)-1]}. You both need to swipe the same day\u2019s ${TOG_N} ${nn}. Ask for today\u2019s code.`};}
   const theirMask=parseInt(m[3],36);
   if(theirMask!==T.mask){const t=maskNames(theirMask), mine=maskNames(T.mask); return {err:`You have different services ticked, so you swiped different ${nn}. Theirs: ${t.join(', ')||'none'}. Yours: ${mine.join(', ')||'none'}. Tick the same services (Settings), then both swipe again.`};}
   if(m[4].toLowerCase()!==togCheck(T.ids)) return {err:`Your apps have different ${nn} lists. Make sure you\u2019re both on the latest version, then swipe again.`};
-  const bits=parseInt(m[5],36); if(!(bits>=0)) return {err:'That code is damaged. Copy it again.'};
-  return {likes:T.ids.filter((id,i)=>Math.floor(bits/2**i)%2===1)};}
+  const bits=parseInt(m[5],36), love=m[6]?parseInt(m[6],36):0; if(!(bits>=0)||!(love>=0)) return {err:'That code is damaged. Copy it again.'};
+  return {likes:T.ids.filter((id,i)=>Math.floor(bits/2**i)%2===1),loves:T.ids.filter((id,i)=>Math.floor(love/2**i)%2===1)};}
 function startTogether(){ensureTog(); TG().active=true; save(); closeSheet(); setTab('swipe');}
 function togHeader(){const done=TOG_N-togLeft().length;
   return `<div class="tog-strip"><div style="min-width:0"><b>Swipe together · ${state.mode==='tv'?'TV':'Films'}</b><div class="small muted num">${done} of ${TOG_N} · the same ${TOG_N} ${noun(state.mode,2)} for both of you today</div></div><button class="btn sm" data-act="togexit">Exit</button></div>
@@ -706,7 +746,7 @@ function togHeader(){const done=TOG_N-togLeft().length;
 function canShare(){try{return !!navigator.share&&window.self===window.top;}catch(e){return false;}}
 function togDoneHtml(){const T=TG(), mine=togLikes();
   return `<div class="tog-done">
-    <h2>All ${TOG_N} swiped</h2><p class="muted">You liked ${mine.length}. Send your code and paste theirs once they've swiped all ${TOG_N} too.</p>
+    <h2>All ${TOG_N} swiped</h2><p class="muted">You liked ${mine.length}${togLoves().length?`, including ${togLoves().length} must watch${togLoves().length===1?'':'es'} ★`:''}. Send your code and paste theirs once they've swiped all ${TOG_N} too.</p>
     <div class="panel"><b>1. Send your code</b><code class="code-box num">${esc(togCode())}</code>
       <div class="row"><button class="btn" data-act="togcopy">Copy my code</button>${canShare()?'<button class="btn" data-act="togshare">Share my code</button>':''}</div>
       <textarea id="tog-mycode" class="inp code" hidden readonly aria-label="Your code"></textarea></div>
@@ -714,9 +754,8 @@ function togDoneHtml(){const T=TG(), mine=togLikes();
       <textarea id="tog-code" class="inp code" style="min-height:70px" placeholder="FS1-..." aria-label="Their code"></textarea>
       <div id="tog-err" class="err" role="alert"></div>
       <button class="btn primary" data-act="togfind">Find our matches</button></div>
-    ${T.matches?`<div class="section-title">You both liked · ${T.matches.length}</div>
-      ${T.matches.length?T.matches.map(id=>{const f=getFilm(id); return f?filmRow(f,{side:inWatch(id)?'<span class="pill">Watchlist</span>':''}):'';}).join('')
-        +`<div class="row"><button class="btn primary" data-act="togpick">Pick one for tonight</button><button class="btn" data-act="togadd">Add all to watchlist</button></div>`
+    ${T.matches?`${T.matches.length?[3,2,1].map(s=>{const ids=T.matches.filter(id=>((T.scores||{})[id]||1)===s); return ids.length?`<div class="section-title">${s===3?'★★ ':s===2?'★ ':''}${TIER_LABEL[s]} · ${ids.length}</div>`+ids.map(id=>{const f=getFilm(id); return f?filmRow(f,{side:inWatch(id)?'<span class="pill">Watchlist</span>':''}):'';}).join(''):'';}).join('')
+        +`<div class="row"><button class="btn primary" data-act="togpick">Pick our best match for tonight</button><button class="btn" data-act="veto" data-v="matches">Veto night</button><button class="btn" data-act="togadd">Add all to watchlist</button></div>`
         :`<p class="small muted">No ${noun(state.mode,2)} in common today. They liked ${T.theirs}, you liked ${mine.length}. Try tomorrow's ${TOG_N}, or swipe the normal deck.</p>`}`:''}
     <div class="row"><button class="btn ghost" data-act="togredo">Swipe today's ${TOG_N} again</button><button class="btn ghost" data-act="togexit">Back to my deck</button></div>
   </div>`;}
@@ -725,6 +764,112 @@ function togDoneHtml(){const T=TG(), mine=togLikes();
    12. LIVE WHERE-TO-WATCH (optional, needs your own free TMDB key)
    Only runs when you add a key. Requests go straight from this device to api.themoviedb.org.
    ------------------------------------------------------------------ */
+function addMatches(){const T=TG(), sc=T.scores||{}, myLoves=new Set(togLoves());
+  T.matches.forEach(fid=>{const w=state.watch.find(x=>x.id===fid), love=(sc[fid]||1)>=2&&(myLoves.has(fid)||sc[fid]===3);
+    if(w){w.both=true; if(love) w.love=true;} else state.watch.unshift(Object.assign({id:fid,t:Date.now(),both:true},love?{love:true}:{})); state.decided[fid]='R';});}
+
+/* ------------------------------------------------------------------
+   11b. VETO NIGHT
+   The app deals a few titles; two people take turns crossing one out until one is left.
+   ------------------------------------------------------------------ */
+let veto=null, vetoSrc='watch', vetoN=5;
+function vetoNames(){const n=state.settings.names||[]; return [n[0]||'Player 1',n[1]||'Player 2'];}
+function vetoPool(src){
+  if(src==='matches'){const T=TG(); return (T&&T.matches||[]).map(id=>({id,p:(T.scores||{})[id]||1}));}
+  if(src==='watch') return state.watch.filter(w=>{const f=getFilm(w.id); return f&&kindOf(f)===state.mode&&(!myServices().length||onMine(f));}).map(w=>({id:w.id,p:(w.love?2:0)+(w.both?1:0)}));
+  return deck().slice(0,40).map(f=>({id:f.id,p:0}));}
+function vetoDeal(){const pool=vetoPool(vetoSrc); pool.forEach(x=>x.r=Math.random()); pool.sort((a,b)=>b.p-a.p||a.r-b.r);
+  const ids=pool.slice(0,vetoN).map(x=>x.id); for(let i=ids.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]];}
+  veto={ids,out:[],by:{},turn:0};}
+function vetoSheet(src){veto=null; const T=TG(); vetoSrc=src||(T&&T.matches&&T.matches.length?'matches':'watch');
+  const draw=()=>{const nm=vetoNames(), nn=noun(state.mode,2);
+    if(!veto){const srcs=[['watch','Our watchlist'],['all','Anything on our services']]; if(T&&T.matches&&T.matches.length) srcs.unshift(['matches','Today’s matches']);
+      const n=vetoPool(vetoSrc).length;
+      return `<h2>Veto night</h2><p class="muted">The app deals a few ${nn}. Take turns crossing one out until only one is left. That's tonight's pick.</p>
+      <div class="grid2"><label class="field" for="vn-0">Goes first<input id="vn-0" value="${esc((state.settings.names||[])[0]||'')}" placeholder="Player 1" maxlength="20" autocomplete="off"></label>
+        <label class="field" for="vn-1">Goes second<input id="vn-1" value="${esc((state.settings.names||[])[1]||'')}" placeholder="Player 2" maxlength="20" autocomplete="off"></label></div>
+      <div class="section-title">Deal from</div><div class="chips wrap">${srcs.map(([k,l])=>`<button class="chip" data-act="vetosrc" data-v="${k}" aria-pressed="${vetoSrc===k}">${l}</button>`).join('')}</div>
+      <div class="section-title">How many</div><div class="chips wrap">${[3,5,7].map(k=>`<button class="chip" data-act="vetonum" data-v="${k}" aria-pressed="${vetoN===k}">${k}</button>`).join('')}</div>
+      <button class="btn primary block" data-act="vetodeal" ${n<2?'disabled':''}>Deal ${Math.min(vetoN,n)} ${noun(state.mode,Math.min(vetoN,n))}</button>
+      ${n<2?`<p class="small muted">There aren't enough ${nn} here yet. Try another "Deal from" option, or switch Films / TV at the top.</p>`:''}`;}
+    const left=veto.ids.filter(id=>!veto.out.includes(id));
+    if(left.length===1){const f=getFilm(left[0]);
+      return `<h2>Tonight it's…</h2><div class="reveal panel" style="gap:12px">${artHtml(f,'hero')}<h3 style="font-size:22px">${esc(f.t)}</h3><span class="small muted num">${esc(factsText(f))}</span><div class="svcs">${svcTags(f)}</div>
+        <div class="row"><button class="btn primary" data-act="settonight" data-id="${esc(f.id)}" data-close="1">Watch this tonight</button><button class="btn" data-act="vetoagain">Deal again</button></div></div>`;}
+    return `<h2>Veto night</h2><div class="veto-turn">${esc(nm[veto.turn%2])}, cross one out</div><p class="small muted">${left.length} left. Tap one to veto it.</p>
+      <div class="veto-list">${veto.ids.map(id=>{const f=getFilm(id), o=veto.out.includes(id); return `<button class="veto-item" data-act="vetoout" data-id="${esc(id)}" ${o?'disabled':''}>${artHtml(f,'mini')}<span style="min-width:0"><b class="film-name" style="display:block">${esc(f.t)}</b><span class="film-meta num">${esc(factsText(f))}</span></span>${o?`<span class="pill plain">${esc(nm[veto.by[id]])} vetoed</span>`:'<span></span>'}</button>`;}).join('')}</div>
+      <button class="btn ghost" data-act="vetoundo" ${veto.out.length?'':'disabled'}>Undo last veto</button>`;};
+  const mount=b=>{[0,1].forEach(i=>{const inp=$('#vn-'+i,b); if(inp) inp.onchange=()=>{state.settings.names=state.settings.names||['','']; state.settings.names[i]=inp.value.trim().slice(0,20); save();};});};
+  openSheet(draw(),{ctx:{redraw:()=>sheetRedraw(draw,mount)},onMount:mount});}
+
+/* ------------------------------------------------------------------
+   11c. DINNER AND A FILM
+   Suggests a cuisine and a cooking time to suit the film, then opens Dinner Swipe with those filters
+   (Dinner Swipe reads a link ending #film-<minutes>-<cuisine>, for example #film-30-italian).
+   ------------------------------------------------------------------ */
+const PAIR_IDS={godfather:'Italian',irishman:'Italian',twopopes:'Italian',conclave:'Italian',gladiator2:'Italian',pinocchio:'Italian',ratatouille:'French',budapest:'Eastern European',
+  coco:'Mexican',roma:'Mexican',okja:'Korean',kpop:'Korean',slumdog:'Indian',societysnow:'Latin American',lemans66:'American',air:'American',oppenheimer:'American',barbie:'American',
+  homealone:'American',diehard:'American',paddington2:'British',paddingtonperu:'British',wallacegromit:'British',pride:'British',favourite:'British',holdovers:'British',
+  'tv-sopranos':'Italian','tv-squidgame':'Korean','tv-pachinko':'Korean','tv-shogun':'Japanese','tv-lupin':'French','tv-moneyheist':'Spanish','tv-narcos':'Mexican','tv-thebear':'American',
+  'tv-whitelotus':'Thai','tv-3body':'Chinese','tv-chernobyl':'Eastern European','tv-succession':'American','tv-yellowstone':'American','tv-1923':'American','tv-ozark':'American',
+  'tv-crown':'British','tv-downton':'British','tv-gavinstacey':'British','tv-peaky':'British','tv-lineofduty':'British','tv-bakeoff':'British','tv-detectorists':'British',
+  'tv-derrygirls':'British','tv-slowhorses':'British','tv-happyvalley':'British','tv-traitors':'British','tv-vera':'British','tv-taskmaster':'British'};
+function pairFor(f){const g=f.g||[], mo=f.mo||[], has=(...k)=>k.some(x=>g.includes(x)||mo.includes(x)); let c, why;
+  if(PAIR_IDS[f.id]){c=PAIR_IDS[f.id]; why=`${c} food to match where it's set.`;}
+  else if(has('kids','fam','ani')){c='Italian'; why='Pasta or pizza that everyone will eat.';}
+  else if(has('hor','thr','edge')){c='Mexican'; why='Tacos and wraps you can eat without looking away from the screen.';}
+  else if(has('rom','date')){c='Spanish'; why='Sharing plates for a night in for two.';}
+  else if(has('com','laugh')){c='American'; why='Burgers and comfort food for a laugh-along night.';}
+  else if(has('sci','fan','mind')){c='Japanese'; why='Something a little different, like the story.';}
+  else if(has('war','his','cosy')){c='British'; why='Proper comfort food for a long sit.';}
+  else {c='Indian'; why='A curry night in.';}
+  const tv=kindOf(f)==='tv', m=f.m||0, mins=tv?30:m>=150?20:m>=120?30:45;
+  const timeWhy=tv?'Quick enough to start the first episode sooner.':m>=150?`It's a long one (${hrs(m)}), so keep cooking short.`:m>=120?'Ready in time to start before it gets late.':'Plenty of time to cook before it starts.';
+  return {c,mins,why,timeWhy};}
+const slug=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+function defaultDinnerUrl(){try{if(/\.github\.io$/.test(location.hostname)) return new URL('../dinner-swipe/',location.href).href;}catch(e){} return 'https://claude.ai/artifact/JTgEEknCa7mD8mT7YkGPc8';}
+function dinnerUrl(){const u=(state.settings.dinnerUrl||'').trim(); return /^https:\/\//i.test(u)?u.replace(/#.*$/,''):defaultDinnerUrl();}
+function pairSheet(id){const f=getFilm(id); if(!f) return; const p=pairFor(f), link=dinnerUrl()+'#film-'+p.mins+'-'+slug(p.c);
+  openSheet(`<h2>Dinner and ${esc(f.t)}</h2>
+    <div class="panel"><div class="pair"><span class="small muted">Cuisine</span><b>${esc(p.c)}</b><span class="small muted">Ready in</span><b class="num">${p.mins} min or less</b></div>
+      <p class="note">${esc(p.why)} ${esc(p.timeWhy)}</p>
+      <a class="btn primary" href="${esc(link)}" target="_blank" rel="noopener noreferrer">${ICON.fork} Open Dinner Swipe</a>
+      <p class="note">Dinner Swipe opens with these filters set. If it doesn't, open <b>Filters</b> there and choose Cuisine: ${esc(p.c)} and Ready in: ${p.mins} min or less.</p></div>
+    <label class="field" for="pair-url">Dinner Swipe address (optional)<input id="pair-url" type="url" inputmode="url" value="${esc(state.settings.dinnerUrl||'')}" placeholder="${esc(defaultDinnerUrl())}" autocomplete="off"></label>
+    <p class="note">Leave blank to use ${/\.github\.io$/.test(location.hostname)?'your dinner-swipe site next to this one':'your claude.ai Dinner Swipe link'}. Paste your Dinner Swipe web address if it lives somewhere else.</p>`,
+  {onMount:b=>{const i=$('#pair-url',b); i.onchange=()=>{const v=i.value.trim(); if(v&&!/^https:\/\//i.test(v)){toast('Use a full https:// address'); return;} state.settings.dinnerUrl=v; save(); pairSheet(id);};}});}
+
+/* ------------------------------------------------------------------
+   11d. SEARCH TMDB FOR ANY TITLE (needs your TMDB key)
+   ------------------------------------------------------------------ */
+let tsKind='film', tsRes=null, tsQ='';
+function findByTmdb(tid,kind,title,year){const norm=s=>String(s||'').toLowerCase().replace(/^(the|a|an)\s+/,'').replace(/[^a-z0-9]/g,'');
+  return allFilms().find(x=>kindOf(x)===kind&&(x.tmdb===tid||state.tmIds[x.id]===tid||(state.live[x.id]||{}).tmdb===tid||(title&&year&&norm(x.t)===norm(title)&&String(x.y)===String(year))));}
+function filmFromTmdb(d,kind){const tv=kind==='tv';
+  const g=tv?[...new Set((d.genres||[]).flatMap(x=>TMDB_TV_GENRES[x.id]||[]))]:(d.genres||[]).map(x=>TMDB_GENRES[x.id]).filter(Boolean);
+  const base={t:(tv?d.name:d.title)||'Untitled',c:certFrom(d),g:g.length?g:['dra'],s:[],st:false,mo:moodsFor(g),d:'',b:String(d.overview||'').slice(0,240),tmdb:d.id,poster:d.poster_path||''};
+  return tv?Object.assign({id:'tvt'+d.id,kind:'tv',y:parseInt(String(d.first_air_date||'').slice(0,4))||''},tvFields(d),base,{d:(d.created_by||[]).map(x=>x.name).slice(0,3).join(', ')})
+    :Object.assign({id:'t'+d.id,kind:'film',y:parseInt(String(d.release_date||'').slice(0,4))||'',m:d.runtime||0},base);}
+function tsSheet(){tsKind=state.mode; tsRes=null;
+  const draw=()=>`<h2>Search TMDB</h2>
+    ${!tmdbKey()?`<p class="muted">Search any film or TV show and add it with its real services, running time and rating. This needs your free TMDB key.</p><button class="btn primary" data-act="tmdb">Set up live updates</button>`:`
+    <div class="chips wrap" role="group" aria-label="Search for">${[['film','Films'],['tv','TV shows']].map(([k,l])=>`<button class="chip" data-act="tskind" data-v="${k}" aria-pressed="${tsKind===k}">${l}</button>`).join('')}</div>
+    <div class="row"><input class="inp" id="ts-q" type="search" enterkeyhint="search" placeholder="Title, for example ${tsKind==='tv'?'Slow Horses':'Paddington'}" value="${esc(tsQ)}" style="flex:1 1 200px" aria-label="Title" autocomplete="off"><button class="btn primary" id="ts-go">Search</button></div>
+    <p class="note" id="ts-msg" role="status">${framed?'Search doesn’t work inside claude.ai. Use your GitHub version of the app.':''}</p>
+    <div class="veto-list">${(tsRes||[]).map(r=>{const name=(tsKind==='tv'?r.name:r.title)||'', yr=String((tsKind==='tv'?r.first_air_date:r.release_date)||'').slice(0,4), have=findByTmdb(r.id,tsKind,name,yr);
+      return `<div class="search-res"><div style="min-width:0"><b>${esc(name)}</b> <span class="small muted num">${esc(yr)}</span>${r.overview?`<p>${esc(r.overview)}</p>`:''}</div>${have?`<button class="btn sm" data-act="open" data-id="${esc(have.id)}">Open</button>`:`<button class="btn sm primary" data-act="tsadd" data-v="${esc(r.id)}">Add</button>`}</div>`;}).join('')}</div>
+    <p class="note">Film details from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`}`;
+  const mount=b=>{const go=$('#ts-go',b), inp=$('#ts-q',b); if(!go) return; go.onclick=tsSearch; inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault(); tsSearch();}};};
+  openSheet(draw(),{ctx:{redraw:()=>sheetRedraw(draw,mount)},onMount:mount});}
+async function tsSearch(){const inp=$('#ts-q'), msg=$('#ts-msg'); if(!inp) return; const q=inp.value.trim(); tsQ=q; if(!q){inp.focus(); return;}
+  if(msg) msg.textContent='Searching…';
+  try{const res=await tmdb(tsKind==='tv'?'/search/tv':'/search/movie',{query:q,include_adult:'false',language:'en-GB'}); tsRes=(res.results||[]).slice(0,10);
+    if(sheetCtx&&sheetCtx.redraw) sheetCtx.redraw(); const m2=$('#ts-msg'); if(m2) m2.textContent=tsRes.length?'':'Nothing found. Check the spelling, or try Films / TV shows above.';}
+  catch(e){const m2=$('#ts-msg'); if(m2) m2.textContent=tmErr(e);}}
+async function tsAdd(tid,btn){if(btn){btn.disabled=true; btn.textContent='Adding…';}
+  try{const d=await details(tid,tsKind), film=filmFromTmdb(d,tsKind); state.live[film.id]=liveFrom(d); state.found.push(film); reindex(); save(); renderAll(); openFilm(film.id); toast('Added '+film.t);}
+  catch(e){toast(tmErr(e)); if(btn){btn.disabled=false; btn.textContent='Add';}}}
+
 const TMDB='https://api.themoviedb.org/3';
 const TMDB_GENRES={28:'act',12:'adv',16:'ani',35:'com',80:'cri',99:'doc',18:'dra',10751:'fam',14:'fan',36:'his',27:'hor',10402:'mus',9648:'mys',10749:'rom',878:'sci',53:'thr',10752:'war',37:'wes'};
 function tmdbKey(){try{return localStorage.getItem(TKEY)||'';}catch(e){return '';}}
@@ -760,7 +905,9 @@ async function tmdbIdFor(f){if(f.tmdb) return f.tmdb; if(state.tmIds[f.id]) retu
   let res=await tmdb(path,{query:f.t,[yk]:f.y||'',include_adult:'false',language:'en-GB'}); let r=(res.results||[]);
   if(!r.length&&f.y){res=await tmdb(path,{query:f.t,include_adult:'false',language:'en-GB'}); r=res.results||[];}
   const hit=r.find(x=>String(x[dk]||'').startsWith(String(f.y)))||r[0]; if(!hit) return 0; state.tmIds[f.id]=hit.id; return hit.id;}
-async function refreshFilm(f){const tid=await tmdbIdFor(f); if(!tid) return false; const kind=kindOf(f), d=await details(tid,kind); state.live[f.id]=liveFrom(d);
+async function refreshFilm(f){const tid=await tmdbIdFor(f); if(!tid) return false; const kind=kindOf(f), d=await details(tid,kind), was=onMine(f); state.live[f.id]=liveFrom(d);
+  /* Moved warning: something on your watchlist was on your services and now isn't */
+  if(inWatch(f.id)&&myServices().length&&!state.svcOverride[f.id]){const now=onMine(f); if(!state.moved) state.moved={}; if(was&&!now) state.moved[f.id]={t:Date.now()}; else if(now) delete state.moved[f.id];}
   if(kind==='tv'&&!f.own){const tf=tvFields(d); state.live[f.id].tv=tf; if(tf.se) f.se=tf.se; f.ye=tf.ye; if(tf.m) f.m=tf.m; if(f.tmdb) f.c=certFrom(d)||f.c;}
   else if(f.tmdb&&!f.own){f.m=d.runtime||f.m; f.c=certFrom(d)||f.c;} return true;}
 async function runPool(items,n,fn,onProg){let i=0,done=0,fatal=null;
@@ -769,7 +916,8 @@ async function runPool(items,n,fn,onProg){let i=0,done=0,fatal=null;
 let tmBusy=false;
 function tmProg(t){const p=$('#tm-prog'); if(p) p.textContent=t;}
 async function refreshMany(films,label){if(tmBusy) return; tmBusy=true; tmProg(`Checking ${plural(films.length,'film')}…`);
-  try{await ensureProviders(); let ok=0; await runPool(films,4,async f=>{if(await refreshFilm(f)) ok++;},(d,n)=>tmProg(`${label}: ${d} of ${n}`)); save(); renderAll(); tmProg(`Done. Updated ${plural(ok,'film')}.`); toast(`Updated ${plural(ok,'film')}`);}
+  try{await ensureProviders(); let ok=0; await runPool(films,4,async f=>{if(await refreshFilm(f)) ok++;},(d,n)=>tmProg(`${label}: ${d} of ${n}`)); save(); renderAll(); const mv=movedIds().length, extra=mv?` ${mv} on your watchlist ${mv===1?'has':'have'} moved off your services.`:'';
+    tmProg(`Done. Updated ${ok} ${ok===1?'title':'titles'}.${extra}`); toast(mv?`${mv} watchlist ${mv===1?'title has':'titles have'} moved`:`Updated ${ok} ${ok===1?'title':'titles'}`);}
   catch(e){tmProg(tmErr(e)); toast(tmErr(e));} finally{tmBusy=false; save();}}
 /* TMDB's TV genres differ from its film genres; each maps to one or more of ours. */
 const TMDB_TV_GENRES={10759:['act','adv'],16:['ani'],35:['com'],80:['cri'],99:['doc'],18:['dra'],10751:['fam'],10762:['fam'],9648:['mys'],10764:['rea'],10765:['sci','fan'],10768:['war'],37:['wes']};
@@ -786,11 +934,7 @@ async function findMore(){if(tmBusy) return; tmBusy=true; const mode=state.mode,
     const titleKey=(t,y)=>String(t).toLowerCase().replace(/[^a-z0-9]/g,'')+':'+y; const builtKeys=new Set(same.map(x=>titleKey(x.t,x.y)));
     const fresh=(res.results||[]).filter(r=>!known.has(r.id)&&!builtKeys.has(titleKey(tv?r.name||'':r.title||'',parseInt(String((tv?r.first_air_date:r.release_date)||'').slice(0,4))||'')));
     let added=0;
-    await runPool(fresh,4,async r=>{const d=await details(r.id,mode);
-      const g=tv?[...new Set((d.genres||[]).flatMap(x=>TMDB_TV_GENRES[x.id]||[]))]:(d.genres||[]).map(x=>TMDB_GENRES[x.id]).filter(Boolean);
-      const base={t:(tv?d.name||r.name:d.title||r.title),c:certFrom(d),g:g.length?g:['dra'],s:[],st:false,mo:moodsFor(g),d:'',b:String(d.overview||'').slice(0,240),tmdb:d.id,poster:d.poster_path||''};
-      const film=tv?Object.assign({id:'tvt'+d.id,kind:'tv',y:parseInt(String(d.first_air_date||'').slice(0,4))||''},tvFields(d),base,{d:(d.created_by||[]).map(x=>x.name).slice(0,3).join(', ')})
-        :Object.assign({id:'t'+d.id,kind:'film',y:parseInt(String(d.release_date||'').slice(0,4))||'',m:d.runtime||0},base);
+    await runPool(fresh,4,async r=>{const d=await details(r.id,mode), film=filmFromTmdb(d,mode);
       state.live[film.id]=liveFrom(d); state.found.push(film); added++;},(d,n)=>tmProg(`Adding ${nn}: ${d} of ${n}`));
     pages[q]=page; reindex(); save(); renderAll();
     const msg=added?`Added ${added} new ${noun(mode,added)} to your deck.`:(page<(res.total_pages||1)?'Nothing new on that page. Tap again for more.':`No more ${nn} found for these filters.`);
@@ -859,6 +1003,8 @@ function settingsSheet(){
   openSheet(`<h2>Settings</h2>
     <div class="panel"><b>Your services</b><div class="svcs">${myServices().length?myServices().map(k=>`<span class="svc mine" style="--sc:${svcInfo(k).c}"><i></i>${esc(svcInfo(k).n)}</span>`).join(''):'<span class="muted">None chosen yet</span>'}</div><button class="btn" data-act="services">Change services</button></div>
     <div class="panel"><b>Live where-to-watch (TMDB)</b><p class="note">${tmdbKey()?'Your key is saved. Check films, find more, or turn on posters.':'Optional. Add a free TMDB key to check what\u2019s on each service today.'}</p><button class="btn" data-act="tmdb">${tmdbKey()?'Open live updates':'Set up live updates'}</button></div>
+    <div class="panel"><div class="kv"><b>Learn from our ratings</b><button class="toggle" data-act="tastetoggle" aria-pressed="${state.settings.taste!==false}">${state.settings.taste!==false?'On':'Off'}</button></div>
+      <p class="note">Genres and moods you rate 4–5 stars come up sooner when swiping; ones you rate 1–2 stars come up later. Starts after 3 ratings${taste().on?` (using ${taste().n} now)`:''}.</p></div>
     <div class="panel"><b>Swipe together</b><p class="note">Both swipe the same ${TOG_N} films today, then swap codes to see your matches. Tick the same services on both phones.</p><button class="btn" data-act="together">Start Swipe together</button></div>
     <div class="panel"><b>Backup and moving phones</b><p class="note">Copy a backup code to keep your watchlist, ratings and films, or move them to another phone.</p><button class="btn" data-act="backup">Backup or restore</button></div>
     <div class="panel"><b>About the built-in list</b><p class="note">${BUILT_FILMS.length} films and ${BUILT_TV.length} TV shows, put together on ${DATA_DATE} from general knowledge, not a live check. Titles marked as the service's own (for example Netflix originals) rarely move; licensed ones do. Season counts for shows still running may be behind. Certificates, age ratings and running times are for guidance; check the BBFC website if it matters.</p></div>
@@ -908,7 +1054,7 @@ function renderNav(){const n=state.watch.filter(w=>getFilm(w.id)).length, b=$('#
   const tn=state.tonight&&getFilm(state.tonight.id), m=myServices(), cnt=modeFilms().filter(onMine).length;
   $$('.appbar .seg-mode button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===state.mode)));
   $('#sub-label').textContent=tn?'Tonight: '+tn.t:m.length?`${cnt} ${noun(state.mode,cnt)} on ${m.length===1?svcInfo(m[0]).n:m.length+' services'}`:'Choose your services to start';}
-function renderAll(){renderNav(); renderView(state.tab); if(sheetCtx&&sheetCtx.redraw) sheetCtx.redraw();}
+function renderAll(){tasteCache=null; renderNav(); renderView(state.tab); if(sheetCtx&&sheetCtx.redraw) sheetCtx.redraw();}
 
 document.addEventListener('click',e=>{
   const tabBtn=e.target.closest('[data-tab]'), el=e.target.closest('[data-act]');
@@ -938,7 +1084,21 @@ document.addEventListener('click',e=>{
       case 'undo': undo(); break;
       case 'info': {const c=$('#deck .card.top'); if(c) openFilm(c.dataset.id,'deck'); break;}
       case 'open': openFilm(id,state.tab); break;
-      case 'dpick': case 'dskip': case 'dseen': {const ctx=sheetCtx; closeSheet(); const top=$('#deck .card.top'); const dir=a==='dpick'?'R':a==='dskip'?'L':'S';
+      case 'love': decide('U'); break;
+      case 'tastetoggle': state.settings.taste=state.settings.taste===false; save(); tasteCache=null; settingsSheet(); renderView(state.tab); break;
+      case 'pair': pairSheet(id); break;
+      case 'movedok': state.moved={}; save(); renderAll(); break;
+      case 'veto': vetoSheet(el.dataset.v); break;
+      case 'vetosrc': vetoSrc=el.dataset.v; sheetCtx&&sheetCtx.redraw(); break;
+      case 'vetonum': vetoN=+el.dataset.v||5; sheetCtx&&sheetCtx.redraw(); break;
+      case 'vetodeal': {[0,1].forEach(i=>{const inp=$('#vn-'+i); if(inp){state.settings.names=state.settings.names||['','']; state.settings.names[i]=inp.value.trim().slice(0,20);}}); save(); vetoDeal(); sheetCtx&&sheetCtx.redraw(); break;}
+      case 'vetoout': if(veto&&!veto.out.includes(id)&&veto.ids.filter(x=>!veto.out.includes(x)).length>1){veto.out.push(id); veto.by[id]=veto.turn%2; veto.turn++; sheetCtx&&sheetCtx.redraw();} break;
+      case 'vetoundo': if(veto&&veto.out.length){const last=veto.out.pop(); delete veto.by[last]; veto.turn--; sheetCtx&&sheetCtx.redraw();} break;
+      case 'vetoagain': veto=null; sheetCtx&&sheetCtx.redraw(); break;
+      case 'tmsearch': tsSheet(); break;
+      case 'tskind': tsKind=el.dataset.v; tsRes=null; sheetCtx&&sheetCtx.redraw(); break;
+      case 'tsadd': tsAdd(+el.dataset.v,el); break;
+      case 'dpick': case 'dskip': case 'dseen': case 'dlove': {const ctx=sheetCtx; closeSheet(); const top=$('#deck .card.top'); const dir=a==='dpick'?'R':a==='dskip'?'L':a==='dlove'?'U':'S';
         if(togOn()&&dir==='S') break;
         if(top&&ctx&&top.dataset.id===ctx.id) setTimeout(()=>decide(dir),reduced()?0:200); else if(ctx) applyDecision(ctx.id,dir); break;}
       case 'addwatch': if(!inWatch(id)){state.watch.unshift({id,t:Date.now()}); state.decided[id]='R'; save(); renderAll(); toast('Added to watchlist');} break;
@@ -978,10 +1138,10 @@ document.addEventListener('click',e=>{
       case 'togshare': if(togOn()&&!togLeft().length) navigator.share({title:'Film Swipe',text:`My Film Swipe ${state.mode==='tv'?'TV':'film'} code for today: ${togCode()}`}).catch(()=>{}); break;
       case 'togfind': {if(!togOn()||togLeft().length) break; const res=readTogCode(($('#tog-code')||{}).value), errEl=$('#tog-err');
         if(res.err){if(errEl) errEl.textContent=res.err; break;}
-        const mine=new Set(togLikes()); TG().matches=res.likes.filter(x=>mine.has(x)); TG().theirs=res.likes.length; save(); renderSwipe(); break;}
-      case 'togadd': if(TG()&&TG().matches){TG().matches.forEach(fid=>{const w=state.watch.find(x=>x.id===fid); if(w) w.both=true; else state.watch.unshift({id:fid,t:Date.now(),both:true}); state.decided[fid]='R';}); TG().active=false; save(); setTab('watch'); renderNav(); toast('Matches added to your watchlist');} break;
-      case 'togpick': if(TG()&&TG().matches&&TG().matches.length){const ms=TG().matches; ms.forEach(fid=>{const w=state.watch.find(x=>x.id===fid); if(w) w.both=true; else state.watch.unshift({id:fid,t:Date.now(),both:true}); state.decided[fid]='R';});
-        const pick=ms[Math.floor(Math.random()*ms.length)]; TG().active=false; save(); setTab('watch'); setTonight(pick);} break;
+        const ranked=rankMatches(res.likes,res.loves); TG().matches=ranked.map(x=>x.id); TG().scores=Object.fromEntries(ranked.map(x=>[x.id,x.score])); TG().theirs=res.likes.length; save(); renderSwipe(); break;}
+      case 'togadd': if(TG()&&TG().matches){addMatches(); TG().active=false; save(); setTab('watch'); renderNav(); toast('Matches added to your watchlist');} break;
+      case 'togpick': if(TG()&&TG().matches&&TG().matches.length){const ms=TG().matches, sc=TG().scores||{}, top=Math.max(...ms.map(id=>sc[id]||1)), best=ms.filter(id=>(sc[id]||1)===top);
+        addMatches(); const pick=best[Math.floor(Math.random()*best.length)]; TG().active=false; save(); setTab('watch'); setTonight(pick);} break;
       case 'wipe': confirmSheet('Delete all your data?','Your watchlist, ratings, films you added and settings are removed from this phone. This cannot be undone. Copy a backup code first if you want to keep them.','Delete everything',()=>{try{localStorage.removeItem(KEY); localStorage.removeItem(TKEY);}catch(e){} state=defaults(); reindex(); setTab('swipe'); renderNav(); servicesSheet(true);},true); break;
     }
     if(el.dataset.close&&a!=='close') closeSheet();
@@ -993,14 +1153,14 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&!$('#sheet').hidden){closeSheet();return;}
   if(e.key==='Enter'&&e.target&&e.target.id==='svc-new'){e.preventDefault(); const b=document.querySelector('[data-act="svcadd"]'); if(b) b.click(); return;}
   if($('#sheet').hidden&&state.tab==='swipe'&&!/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'')){
-    if(e.key==='ArrowRight'){e.preventDefault();decide('R');} else if(e.key==='ArrowLeft'){e.preventDefault();decide('L');} else if(e.key==='ArrowDown'&&!togOn()){e.preventDefault();decide('S');}
+    if(e.key==='ArrowRight'){e.preventDefault();decide('R');} else if(e.key==='ArrowLeft'){e.preventDefault();decide('L');} else if(e.key==='ArrowDown'&&!togOn()){e.preventDefault();decide('S');} else if(e.key==='ArrowUp'){e.preventDefault();decide('U');}
   }
 });
 
 /* Boot */
 if(!['swipe','watch','seen','browse'].includes(state.tab)) state.tab='swipe';
 ['watch','own','found','history','front'].forEach(k=>{if(!Array.isArray(state[k])) state[k]=[];});
-['decided','watched','svcOverride','live','tmIds','togs'].forEach(k=>{if(!state[k]||typeof state[k]!=='object'||Array.isArray(state[k])) state[k]={};});
+['decided','watched','svcOverride','live','tmIds','togs','moved'].forEach(k=>{if(!state[k]||typeof state[k]!=='object'||Array.isArray(state[k])) state[k]={};});
 if(state.tog){ if(!state.togs.film) state.togs.film=state.tog; delete state.tog; }
 if(!['film','tv'].includes(state.mode)) state.mode='film';
 renderNav(); setTab(state.tab);
